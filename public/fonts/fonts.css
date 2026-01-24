@@ -1,0 +1,8 @@
+/* System Fonts CSS - uTools Plugin Compatible */
+/* 仅使用系统字体，无需额外字体文件 */
+
+/* 字体变量定义 - 使用系统字体 */
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  --font-mono: 'Consolas', 'Monaco', 'Courier New', 'Liberation Mono', 'Menlo', monospace;
+}

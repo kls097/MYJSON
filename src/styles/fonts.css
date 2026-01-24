@@ -1,0 +1,38 @@
+/* 字体方案配置 - 当前启用: 方案1 */
+/* ============ 方案1: Inter + JetBrains Mono (现代简洁) ============ */
+:root {
+  --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-code: 'JetBrains Mono', 'Fira Code', 'Consolas', 'Monaco', monospace;
+}
+
+/* ============ 方案2: Noto Sans SC + Fira Code (中文优化) ============ */
+/*
+:root {
+  --font-ui: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'Fira Code', 'JetBrains Mono', 'Consolas', monospace;
+}
+*/
+
+/* ============ 方案3: HarmonyOS Sans + JetBrains Mono (国产字体) ============ */
+/*
+:root {
+  --font-ui: 'HarmonyOS Sans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-code: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+*/
+
+/* ============ 方案4: Lato + Consolas (传统经典) ============ */
+/*
+:root {
+  --font-ui: 'Lato', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-code: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+*/
+
+/* ============ 方案5: Poppins + JetBrains Mono (活泼现代) ============ */
+/*
+:root {
+  --font-ui: 'Poppins', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+  --font-code: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+}
+*/
