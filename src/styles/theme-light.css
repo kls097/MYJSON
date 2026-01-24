@@ -1,0 +1,40 @@
+/* Light theme variables */
+:root {
+  --primary: #2196F3;
+  --primary-hover: #1976D2;
+  --primary-light: #BBDEFB;
+
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F5F5F5;
+  --bg-hover: #EEEEEE;
+
+  --text-primary: #212121;
+  --text-secondary: #757575;
+  --text-disabled: #BDBDBD;
+
+  --border: #E0E0E0;
+  --border-light: #F5F5F5;
+
+  --success: #4CAF50;
+  --error: #F44336;
+  --warning: #FF9800;
+  --info: #2196F3;
+
+  --shadow: 0 2px 4px rgba(0,0,0,0.1);
+  --shadow-lg: 0 4px 8px rgba(0,0,0,0.15);
+
+  --radius: 4px;
+  --radius-lg: 8px;
+
+  --transition: all 0.2s ease;
+
+  /* 差异颜色 */
+  --diff-added: #4CAF50;
+  --diff-added-bg: rgba(76, 175, 80, 0.1);
+  --diff-removed: #F44336;
+  --diff-removed-bg: rgba(244, 67, 54, 0.1);
+  --diff-modified: #FF9800;
+  --diff-modified-bg: rgba(255, 152, 0, 0.1);
+  --diff-current: #2196F3;
+  --diff-current-bg: rgba(33, 150, 243, 0.15);
+}

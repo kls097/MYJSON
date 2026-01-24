@@ -1,0 +1,360 @@
+/* Global styles */
+@import './fonts.css';
+@import './theme-light.css';
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+#app {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Button styles */
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: white;
+  font-size: 13px;
+  cursor: pointer;
+  transition: var(--transition);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn:hover {
+  background: var(--primary-hover);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.btn:disabled {
+  background: var(--text-disabled);
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+.btn-secondary:hover {
+  background: var(--bg-hover);
+}
+
+.btn-success {
+  background: var(--success);
+}
+
+.btn-error {
+  background: var(--error);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+/* Input styles */
+input, select, textarea {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: inherit;
+  transition: var(--transition);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px var(--primary-light);
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* Utility classes */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.gap-2 {
+  gap: 8px;
+}
+
+.gap-4 {
+  gap: 16px;
+}
+
+.mt-2 {
+  margin-top: 8px;
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.mb-2 {
+  margin-bottom: 8px;
+}
+
+.p-2 {
+  padding: 8px;
+}
+
+.p-4 {
+  padding: 16px;
+}
+
+.text-sm {
+  font-size: 12px;
+}
+
+.text-muted {
+  color: var(--text-secondary);
+}
+
+.text-error {
+  color: var(--error);
+}
+
+.text-success {
+  color: var(--success);
+}
+
+.border-b {
+  border-bottom: 1px solid var(--border);
+}
+
+.overflow-auto {
+  overflow: auto;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.3s ease;
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease;
+}
+
+/* CodeMirror Search Panel 优化样式 */
+.cm-panel.cm-search {
+  padding: 12px 16px !important;
+  background: var(--bg-primary) !important;
+  border-top: 2px solid var(--primary) !important;
+  border-bottom: 1px solid var(--border) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+.cm-panel.cm-search input {
+  font-size: 14px !important;
+  padding: 8px 12px !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  min-width: 200px !important;
+}
+
+.cm-panel.cm-search input:focus {
+  outline: none !important;
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px var(--primary-light) !important;
+}
+
+.cm-panel.cm-search label {
+  font-size: 14px !important;
+  color: var(--text-primary) !important;
+  font-weight: 500 !important;
+  margin-right: 8px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.cm-panel.cm-search button {
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+  border: none !important;
+  border-radius: var(--radius) !important;
+  background: var(--primary) !important;
+  color: white !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  font-weight: 500 !important;
+  margin: 0 4px !important;
+}
+
+.cm-panel.cm-search button:hover {
+  background: var(--primary-hover) !important;
+  transform: translateY(-1px) !important;
+}
+
+.cm-panel.cm-search button:active {
+  transform: translateY(0) !important;
+}
+
+.cm-panel.cm-search button[name="close"] {
+  background: var(--bg-secondary) !important;
+  color: var(--text-primary) !important;
+  font-size: 16px !important;
+  padding: 6px 10px !important;
+}
+
+.cm-panel.cm-search button[name="close"]:hover {
+  background: var(--error) !important;
+  color: white !important;
+}
+
+.cm-panel.cm-search .cm-button {
+  font-size: 13px !important;
+  padding: 8px 16px !important;
+}
+
+/* 搜索替换按钮组 */
+.cm-panel.cm-search > * {
+  margin: 4px 0 !important;
+}
+
+.cm-panel.cm-search br {
+  display: none !important;
+}
+
+/* 搜索结果高亮优化 */
+.cm-searchMatch {
+  background-color: rgba(255, 213, 79, 0.3) !important;
+  outline: 1px solid rgba(255, 213, 79, 0.8) !important;
+}
+
+.cm-searchMatch-selected {
+  background-color: rgba(255, 171, 0, 0.5) !important;
+  outline: 2px solid rgba(255, 171, 0, 1) !important;
+}
+
+/* 复选框样式优化 */
+.cm-panel.cm-search input[type="checkbox"] {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  margin: 0 6px 0 0 !important;
+  cursor: pointer !important;
+}
+
+/* 搜索面板布局优化 */
+.cm-panel.cm-search {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 12px !important;
+}
+
+/* CodeMirror 编辑器字体 */
+.cm-editor {
+  font-family: var(--font-code) !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+}
+
+.cm-content {
+  font-family: var(--font-code) !important;
+  padding: 16px !important;
+}
+
+/* 树状视图代码字体 */
+.tree-node-key {
+  font-family: var(--font-code) !important;
+}
+
+.tree-node-string {
+  font-family: var(--font-code) !important;
+}
+
+.tree-node-number {
+  font-family: var(--font-code) !important;
+}
+
+.tree-node-boolean {
+  font-family: var(--font-code) !important;
+}
+
+.tree-node-null {
+  font-family: var(--font-code) !important;
+}
+
