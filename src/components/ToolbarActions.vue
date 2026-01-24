@@ -145,6 +145,10 @@
             <span class="dropdown-item-icon">📥</span>
             导入 JSON
           </button>
+          <button class="dropdown-item" @click="handleDropdownAction('save-to-local')" :disabled="!hasContent">
+            <span class="dropdown-item-icon">💾</span>
+            保存到本地
+          </button>
           <button class="dropdown-item" @click="handleDropdownAction('import-excel')">
             <span class="dropdown-item-icon">📊</span>
             从表格导入
@@ -219,6 +223,7 @@ const emit = defineEmits([
   'toggle-convert',
   'change-view',
   'import-json',
+  'save-to-local',
   'import-excel',
   'export-excel',
   'open-compare',
