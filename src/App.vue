@@ -38,6 +38,7 @@
         @toggle-convert="showConvertPanel = !showConvertPanel"
         @change-view="handleViewChange"
         @import-json="handleImportJson"
+        @save-to-local="handleSaveToLocal"
         @import-excel="handleImportExcel"
         @export-excel="handleExportExcel"
         @open-compare="handleOpenCompare"
@@ -1008,6 +1009,80 @@ const handleExportExcel = () => {
   } catch (error) {
     console.error('Excel 导出失败:', error)
     alert(`导出失败: ${error.message}`)
+  }
+}
+
+// 处理保存到本地文件
+const handleSaveToLocal = () => {
+  try {
+    if (!currentJson.value || !currentJson.value.trim()) {
+      alert('当前没有内容可保存')
+      return
+    }
+
+    // 生成默认文件名
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    const defaultName = `json_${timestamp}.json`
+
+    // 优先使用 uTools 的文件保存对话框
+    if (window.utools && window.utools.showSaveDialog) {
+      const filePath = window.utools.showSaveDialog({
+        title: '保存 JSON 到本地',
+        defaultPath: defaultName,
+        buttonLabel: '保存',
+        filters: [
+          { name: 'JSON 文件', extensions: ['json'] },
+          { name: '文本文件', extensions: ['txt'] }
+        ]
+      })
+
+      if (!filePath) {
+        // 用户取消保存
+        return
+      }
+
+      // 使用 preload 提供的文件写入功能
+      if (window.preloadUtils && window.preloadUtils.writeFile) {
+        // 确保当前 JSON 是格式化的
+        let contentToSave = currentJson.value
+        try {
+          const parsed = JSON.parse(contentToSave)
+          contentToSave = JSON.stringify(parsed, null, 2)
+        } catch (e) {
+          // 如果不是有效 JSON，直接保存原内容
+        }
+
+        const success = window.preloadUtils.writeFile(filePath, contentToSave)
+
+        if (!success) {
+          alert('保存失败')
+        }
+        return
+      }
+    }
+
+    // 浏览器环境下使用 Blob 和 download
+    let contentToSave = currentJson.value
+    try {
+      const parsed = JSON.parse(contentToSave)
+      contentToSave = JSON.stringify(parsed, null, 2)
+    } catch (e) {
+      // 如果不是有效 JSON，直接保存原内容
+    }
+
+    const blob = new Blob([contentToSave], {
+      type: 'application/json;charset=utf-8'
+    })
+
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = defaultName
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (error) {
+    console.error('保存到本地失败:', error)
+    alert(`保存失败: ${error.message}`)
   }
 }
 </script>
