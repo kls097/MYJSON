@@ -66,7 +66,7 @@
       <!-- 压缩: 紧凑花括号 -->
       <button class="btn btn-icon has-tooltip" @click="$emit('compress', false)" :disabled="!hasContent">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M6 6c-2 0-2 2-2 3s0 2 2 3c-2 1-2 2-2 3s0 3 2 3"/>
+          <path d="M6 6c-2 0-2 2-2 3s0 2 2 3c-2 1-2 2-2 3s0 2 2 3"/>
           <path d="M18 6c2 0 2 2 2 3s0 2-2 3c2 1 2 2 2 3s0 3-2 3"/>
           <circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/>
           <circle cx="14" cy="12" r="1" fill="currentColor" stroke="none"/>
@@ -132,6 +132,10 @@
             <span class="dropdown-item-icon">📜</span>
             历史记录
           </button>
+          <button class="dropdown-item" @click="handleDropdownAction('toggle-schema')">
+            <span class="dropdown-item-icon">📝</span>
+            Schema 验证
+          </button>
           <button class="dropdown-item" @click="handleDropdownAction('open-compare')">
             <span class="dropdown-item-icon">⚖️</span>
             比较视图
@@ -154,7 +158,7 @@
             从表格导入
           </button>
           <button class="dropdown-item" @click="handleDropdownAction('export-excel')" :disabled="!hasContent">
-            <span class="dropdown-item-icon">📤</span>
+            <span class="dropdown-item-icon">📈</span>
             导出为表格
           </button>
         </div>
@@ -201,16 +205,6 @@ const props = defineProps({
   }
 })
 
-// 视图模式标签
-const viewModeLabel = computed(() => {
-  switch (props.viewMode) {
-    case 'code': return '代码'
-    case 'tree': return '树形'
-    case 'table': return '表格'
-    default: return '视图'
-  }
-})
-
 const emit = defineEmits([
   'format',
   'compress',
@@ -221,6 +215,7 @@ const emit = defineEmits([
   'toggle-history',
   'toggle-query',
   'toggle-convert',
+  'toggle-schema',
   'change-view',
   'import-json',
   'save-to-local',
@@ -235,6 +230,15 @@ const showDropdown = ref(false)
 const dropdownRef = ref(null)
 const showViewDropdown = ref(false)
 const viewDropdownRef = ref(null)
+
+const viewModeLabel = computed(() => {
+  switch (props.viewMode) {
+    case 'code': return '代码'
+    case 'tree': return '树形'
+    case 'table': return '表格'
+    default: return '视图'
+  }
+})
 
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value
@@ -295,11 +299,6 @@ onUnmounted(() => {
 .toolbar-section:not(:last-child) {
   padding-right: 16px;
   border-right: 1px solid var(--border);
-}
-
-.dropdown-section {
-  border-right: none !important;
-  padding-right: 0 !important;
 }
 
 .dropdown {
@@ -465,5 +464,26 @@ onUnmounted(() => {
   font-size: 11px;
   opacity: 0.5;
   flex-shrink: 0;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 13px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.btn-sm:hover {
+  background: var(--bg-hover);
+}
+
+.btn-secondary {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
 }
 </style>
