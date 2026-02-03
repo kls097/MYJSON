@@ -22,6 +22,7 @@
         :has-content="!!currentJson"
         :show-query="showQueryPanel"
         :show-convert="showConvertPanel"
+        :show-schema="showSchemaPanel"
         :view-mode="currentViewMode"
         :can-undo="canUndo"
         :can-redo="canRedo"
@@ -36,6 +37,7 @@
         @toggle-history="showHistory = !showHistory"
         @toggle-query="showQueryPanel = !showQueryPanel"
         @toggle-convert="showConvertPanel = !showConvertPanel"
+        @toggle-schema="showSchemaPanel = !showSchemaPanel"
         @change-view="handleViewChange"
         @import-json="handleImportJson"
         @save-to-local="handleSaveToLocal"
@@ -99,6 +101,14 @@
         @compare-with-current="handleCompareWithCurrent"
       />
 
+      <SchemaValidatorPanel
+        v-if="showSchemaPanel"
+        :current-json="currentJson"
+        @close="showSchemaPanel = false"
+        @apply-mock="handleApplyMock"
+        @jump-to-error="handleJumpToError"
+      />
+
       <SaveDialog
         :is-open="showSaveDialog"
         :default-name="defaultSaveName"
@@ -128,6 +138,7 @@ import StatusBar from './components/StatusBar.vue'
 import SaveDialog from './components/SaveDialog.vue'
 import JsonCompareView from './components/JsonCompareView.vue'
 import TableView from './components/TableView.vue'
+import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
 import { useJsonStorage } from './composables/useJsonStorage'
 import { useClipboard } from './composables/useClipboard'
@@ -155,6 +166,7 @@ const showHistory = ref(false)
 const showSaveDialog = ref(false)
 const showQueryPanel = ref(false)  // 默认隐藏查询面板
 const showConvertPanel = ref(false)  // 默认隐藏转换面板
+const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
@@ -1084,6 +1096,29 @@ const handleSaveToLocal = () => {
     console.error('保存到本地失败:', error)
     alert(`保存失败: ${error.message}`)
   }
+}
+
+// ============ Schema 面板相关方法 ============
+
+/**
+ * 应用 Mock 数据到编辑器
+ * @param {string} mockData - Mock JSON 字符串
+ */
+const handleApplyMock = (mockData) => {
+  if (mockData) {
+    currentJson.value = mockData
+    pushHistory(currentJson.value)
+  }
+}
+
+/**
+ * 跳转到错误位置
+ * @param {Object} error - 错误对象
+ */
+const handleJumpToError = (error) => {
+  // 可以实现跳转到编辑器特定行的逻辑
+  // 目前只是简单的提示
+  console.log('跳转到错误:', error)
 }
 </script>
 
