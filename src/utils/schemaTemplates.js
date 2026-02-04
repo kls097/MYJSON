@@ -109,7 +109,7 @@ export const builtinTemplates = {
   // 订单信息
   order: {
     name: '订单信息',
-    description: '电商订单数据模型',
+    description: '电商订单数据模型 (Order)',
     icon: '📦',
     category: '电商',
     schema: {

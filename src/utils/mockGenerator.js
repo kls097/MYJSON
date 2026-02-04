@@ -101,11 +101,14 @@ export function generateMockData(schema, options = {}) {
  * @param {number|null} seed - 随机种子
  */
 function configureJsf(config, seed) {
-  jsf.option(config)
+  // 新版 json-schema-faker 使用 option 方法设置种子
+  const options = { ...config }
   
   if (seed !== null) {
-    jsf.seed(seed)
+    options.seed = seed
   }
+  
+  jsf.option(options)
 }
 
 /**

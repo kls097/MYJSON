@@ -2,7 +2,7 @@
  * JSON Schema 生成工具
  * 使用 quicktype-core 从 JSON 数据生成 JSON Schema
  */
-import { quicktype, InputData, JSONSchemaTargetLanguage } from 'quicktype-core'
+import { quicktype, InputData, JSONSchemaTargetLanguage, jsonInputForTargetLanguage } from 'quicktype-core'
 
 /**
  * 生成选项
@@ -40,26 +40,30 @@ export async function generateSchema(jsonData, options = {}) {
     // 解析 JSON 以验证格式
     const parsed = JSON.parse(jsonString)
     
-    // 准备输入数据
-    const inputData = new InputData()
-    inputData.addSource({
-      kind: 'json',
+    // 准备输入数据 - 使用 jsonInputForTargetLanguage
+    const jsonInput = jsonInputForTargetLanguage('json-schema')
+    await jsonInput.addSource({
       name: 'Root',
       samples: [JSON.stringify(parsed)]
     })
+    
+    const inputData = new InputData()
+    inputData.addInput(jsonInput)
 
     // 使用 quicktype 生成 Schema
     const result = await quicktype({
       inputData,
-      lang: new JSONSchemaTargetLanguage(),
+      lang: 'json-schema',
       alphabetizeProperties: true,
       allPropertiesOptional: opts.required === 'none',
-      inferMaps: !opts.strict,
-      inferEnums: opts.strict,
-      inferDates: true,
-      inferIntegerStrings: false,
-      inferUuids: false,
-      inferUrls: false
+      inference: {
+        inferMaps: !opts.strict,
+        inferEnums: opts.strict,
+        inferDates: true,
+        inferIntegerStrings: false,
+        inferUuids: false,
+        inferUrls: false
+      }
     })
 
     let schema = result.lines.join('\n')
@@ -87,30 +91,34 @@ export async function generateSchemaFromSamples(samples, options = {}) {
       throw new Error('至少需要提供一个 JSON 样本')
     }
 
-    // 准备输入数据
-    const inputData = new InputData()
+    // 准备输入数据 - 使用 jsonInputForTargetLanguage
+    const jsonInput = jsonInputForTargetLanguage('json-schema')
     
-    samples.forEach((sample, index) => {
+    for (let index = 0; index < samples.length; index++) {
+      const sample = samples[index]
       const jsonString = typeof sample === 'string' ? sample : JSON.stringify(sample)
       // 验证 JSON 格式
       JSON.parse(jsonString)
       
-      inputData.addSource({
-        kind: 'json',
+      await jsonInput.addSource({
         name: `Sample${index + 1}`,
         samples: [jsonString]
       })
-    })
+    }
+    
+    const inputData = new InputData()
+    inputData.addInput(jsonInput)
 
     // 使用 quicktype 生成 Schema
     const result = await quicktype({
       inputData,
-      lang: new JSONSchemaTargetLanguage(),
+      lang: 'json-schema',
       alphabetizeProperties: true,
       allPropertiesOptional: opts.required === 'none',
-      inferMaps: !opts.strict,
-      mergeSimilarClasses: true,
-      combineClasses: true
+      inference: {
+        inferMaps: !opts.strict,
+        inferEnums: opts.strict
+      }
     })
 
     let schema = result.lines.join('\n')
@@ -130,7 +138,46 @@ export async function generateSchemaFromSamples(samples, options = {}) {
  */
 function postProcessSchema(schema, options) {
   try {
-    const schemaObj = JSON.parse(schema)
+    let schemaObj = JSON.parse(schema)
+    
+    // 处理多样本生成的情况：没有 $ref 但有多个 definitions
+    if (!schemaObj.$ref && schemaObj.definitions && Object.keys(schemaObj.definitions).length > 0) {
+      // 合并所有 definition 到一个统一的 schema
+      const defs = Object.values(schemaObj.definitions)
+      if (defs.length > 0) {
+        // 以第一个 definition 为基础，合并其他 definition 的属性
+        let mergedSchema = { ...defs[0] }
+        for (let i = 1; i < defs.length; i++) {
+          mergeDefinitionIntoSchema(mergedSchema, defs[i])
+        }
+        schemaObj = {
+          $schema: schemaObj.$schema,
+          ...mergedSchema
+        }
+      }
+    }
+    
+    // 如果 schema 使用了 $ref 引用 definitions，展开它
+    if (schemaObj.$ref && schemaObj.definitions) {
+      const refName = schemaObj.$ref.replace('#/definitions/', '')
+      if (schemaObj.definitions[refName]) {
+        // 合并定义的内容到顶层
+        const definition = schemaObj.definitions[refName]
+        schemaObj = {
+          $schema: schemaObj.$schema,
+          ...definition,
+          definitions: schemaObj.definitions
+        }
+      }
+    }
+    
+    // 展开所有 $ref 引用
+    if (schemaObj.definitions) {
+      expandRefs(schemaObj, schemaObj.definitions)
+    }
+    
+    // 删除 definitions（因为已经展开了）
+    delete schemaObj.definitions
     
     // 设置 $schema 版本
     const versionMap = {
@@ -164,6 +211,65 @@ function postProcessSchema(schema, options) {
   } catch (error) {
     console.warn('Schema 后处理失败:', error)
     return schema
+  }
+}
+
+/**
+ * 合并 definition 到 schema
+ * @param {Object} target - 目标 schema
+ * @param {Object} source - 源 definition
+ */
+function mergeDefinitionIntoSchema(target, source) {
+  if (!target.properties) target.properties = {}
+  if (!target.required) target.required = []
+  
+  if (source.properties) {
+    Object.entries(source.properties).forEach(([key, prop]) => {
+      if (!target.properties[key]) {
+        target.properties[key] = prop
+      }
+    })
+  }
+  
+  if (source.required) {
+    source.required.forEach(field => {
+      if (!target.required.includes(field)) {
+        target.required.push(field)
+      }
+    })
+  }
+}
+
+/**
+ * 展开 schema 中的所有 $ref 引用
+ * @param {Object} schema - Schema 对象
+ * @param {Object} definitions - 定义映射
+ */
+function expandRefs(schema, definitions) {
+  if (!schema || typeof schema !== 'object') return
+  
+  // 处理 $ref
+  if (schema.$ref && schema.$ref.startsWith('#/definitions/')) {
+    const refName = schema.$ref.replace('#/definitions/', '')
+    if (definitions[refName]) {
+      // 复制引用的定义内容
+      const refContent = { ...definitions[refName] }
+      // 删除 $ref 并合并内容
+      delete schema.$ref
+      Object.assign(schema, refContent)
+    }
+  }
+  
+  // 递归处理 properties
+  if (schema.properties) {
+    Object.values(schema.properties).forEach(prop => {
+      expandRefs(prop, definitions)
+    })
+  }
+  
+  // 递归处理 items
+  if (schema.items) {
+    expandRefs(schema.items, definitions)
   }
 }
 
