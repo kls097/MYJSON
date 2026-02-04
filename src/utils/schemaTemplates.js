@@ -784,11 +784,18 @@ export function searchTemplates(keyword) {
   
   const lowerKeyword = keyword.toLowerCase()
   return getAllTemplates().filter(template => {
-    return (
+    // 搜索名称、描述、分类
+    const basicMatch = (
       template.name.toLowerCase().includes(lowerKeyword) ||
       template.description.toLowerCase().includes(lowerKeyword) ||
       template.category.toLowerCase().includes(lowerKeyword)
     )
+    
+    // 同时搜索 schema 的 title（支持英文关键词）
+    const schemaTitle = template.schema?.title || ''
+    const schemaMatch = schemaTitle.toLowerCase().includes(lowerKeyword)
+    
+    return basicMatch || schemaMatch
   })
 }
 

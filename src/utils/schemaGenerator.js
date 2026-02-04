@@ -140,8 +140,17 @@ function postProcessSchema(schema, options) {
   try {
     let schemaObj = JSON.parse(schema)
     
+    // 展开所有 $ref 引用（在处理其他逻辑之前）
+    if (schemaObj.definitions) {
+      expandRefs(schemaObj, schemaObj.definitions)
+    }
+    
     // 处理多样本生成的情况：没有 $ref 但有多个 definitions
     if (!schemaObj.$ref && schemaObj.definitions && Object.keys(schemaObj.definitions).length > 0) {
+      // 保留原始类型相关属性
+      const originalType = schemaObj.type
+      const originalItems = schemaObj.items
+      
       // 合并所有 definition 到一个统一的 schema
       const defs = Object.values(schemaObj.definitions)
       if (defs.length > 0) {
@@ -150,9 +159,19 @@ function postProcessSchema(schema, options) {
         for (let i = 1; i < defs.length; i++) {
           mergeDefinitionIntoSchema(mergedSchema, defs[i])
         }
+        
+        // 构建最终的 schema，保留原始类型信息
         schemaObj = {
           $schema: schemaObj.$schema,
           ...mergedSchema
+        }
+        
+        // 如果是数组类型，恢复 type 和 items
+        if (originalType === 'array') {
+          schemaObj.type = 'array'
+          if (originalItems) {
+            schemaObj.items = originalItems
+          }
         }
       }
     }
@@ -171,7 +190,7 @@ function postProcessSchema(schema, options) {
       }
     }
     
-    // 展开所有 $ref 引用
+    // 再次展开（因为可能在处理 $ref 后又出现了新的 $ref）
     if (schemaObj.definitions) {
       expandRefs(schemaObj, schemaObj.definitions)
     }
