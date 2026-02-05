@@ -1,23 +1,6 @@
 <template>
   <div class="toolbar">
-    <div class="toolbar-section undo-redo-section">
-      <button 
-        class="btn btn-icon" 
-        @click="$emit('undo')" 
-        :disabled="!canUndo"
-        title="撤销 (Ctrl+Z)"
-      >
-        ↶
-      </button>
-      <button 
-        class="btn btn-icon" 
-        @click="$emit('redo')" 
-        :disabled="!canRedo"
-        title="重做 (Ctrl+Y)"
-      >
-        ↷
-      </button>
-    </div>
+    <!-- 撤销/重做功能已移除，使用 CodeMirror 的原生撤销/重做 -->
 
     <div class="toolbar-section view-section">
       <div class="dropdown" ref="viewDropdownRef">
@@ -195,14 +178,6 @@ const props = defineProps({
     type: String,
     default: 'code'
   },
-  canUndo: {
-    type: Boolean,
-    default: false
-  },
-  canRedo: {
-    type: Boolean,
-    default: false
-  },
   needsFix: {
     type: Boolean,
     default: false
@@ -239,9 +214,7 @@ const emit = defineEmits([
   'save-to-local',
   'import-excel',
   'export-excel',
-  'open-compare',
-  'undo',
-  'redo'
+  'open-compare'
 ])
 
 const showDropdown = ref(false)

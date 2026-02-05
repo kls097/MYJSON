@@ -24,8 +24,8 @@
         :show-convert="showConvertPanel"
         :show-schema="showSchemaPanel"
         :view-mode="currentViewMode"
-        :can-undo="canUndo"
-        :can-redo="canRedo"
+        :can-undo="false"
+        :can-redo="false"
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
         @format="handleFormat"
@@ -44,8 +44,6 @@
         @import-excel="handleImportExcel"
         @export-excel="handleExportExcel"
         @open-compare="handleOpenCompare"
-        @undo="handleUndo"
-        @redo="handleRedo"
       />
 
       <div class="main-content">
@@ -359,35 +357,12 @@ const handleKeydown = (event) => {
     event.preventDefault()
     handleSave()
   }
-  // Ctrl+Z 或 Cmd+Z (Mac) - 撤销
-  if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
-    event.preventDefault()
-    handleUndo()
-  }
-  // Ctrl+Y 或 Cmd+Shift+Z (Mac) - 重做
-  if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
-    event.preventDefault()
-    handleRedo()
-  }
+  // 移除 Ctrl+Z 和 Ctrl+Y 的全局拦截，让 CodeMirror 的原生撤销/重做生效
 }
 
-// 撤销操作
-const handleUndo = () => {
-  const content = undo()
-  if (content !== null) {
-    currentJson.value = content
-    validate()
-  }
-}
-
-// 重做操作
-const handleRedo = () => {
-  const content = redo()
-  if (content !== null) {
-    currentJson.value = content
-    validate()
-  }
-}
+// 注意：撤销/重做功能已改为使用 CodeMirror 的原生功能
+// useHistory 现在仅用于记录重要操作（格式化、压缩等）的历史
+// 不再通过快捷键触发，让编辑器自己处理 Ctrl+Z/Ctrl+Y
 
 // 清理事件监听器
 onUnmounted(() => {
