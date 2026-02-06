@@ -13,7 +13,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, StateEffect, StateField } from '@codemirror/state'
-import { Decoration } from '@codemirror/view'
+import { Decoration, scrollIntoView } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 
 const props = defineProps({
@@ -346,9 +346,36 @@ watch(() => props.diffs, () => {
   updateDecorations()
 }, { deep: true })
 
-// 监听 currentDiffIndex 变化
-watch(() => props.currentDiffIndex, () => {
+// 监听 currentDiffIndex 变化 - 滚动到当前差异位置
+watch(() => props.currentDiffIndex, (newIndex) => {
   updateDecorations()
+  
+  // BUG FIX: 滚动到当前差异位置
+  if (editorView && props.diffs && props.diffs[newIndex]) {
+    const diff = props.diffs[newIndex]
+    const targetLine = diff.line  // 0-based line number from diff
+    
+    if (targetLine >= 0 && targetLine < props.lineTypes?.length) {
+      // 找到对应的 CodeMirror 行 (CodeMirror 使用 1-based 行号)
+      const cmLineNumber = targetLine + 1
+      
+      if (cmLineNumber <= editorView.state.doc.lines) {
+        const line = editorView.state.doc.line(cmLineNumber)
+        
+        // 使用 scrollIntoView 效果滚动到行中间
+        const scrollEffect = scrollIntoView(line.from, {
+          y: 'center',
+          x: 'start'
+        })
+        
+        editorView.dispatch({
+          effects: scrollEffect
+        })
+        
+        console.log(`[Debug CompareEditor ${props.side}] 滚动到差异位置: 行 ${targetLine + 1}`)
+      }
+    }
+  }
 })
 </script>
 
@@ -421,11 +448,23 @@ watch(() => props.currentDiffIndex, () => {
   padding-left: 2px !important;
 }
 
-/* 占位符行样式 */
+/* 占位符行样式 - BUG FIX: 确保高度与正常行一致 */
 :deep(.cm-diff-placeholder) {
   background-color: #f5f5f5 !important;
   position: relative;
-  color: transparent !important; /* 隐藏原始内容 */
+  min-height: 20px !important; /* 确保最小高度与 CodeMirror 行高一致 */
+}
+
+:deep(.cm-diff-placeholder .cm-line) {
+  color: transparent !important;
+  min-height: 20px !important;
+  line-height: 20px !important;
+}
+
+/* 确保所有行高度一致 */
+:deep(.cm-line) {
+  min-height: 20px !important;
+  line-height: 20px !important;
 }
 
 /* 为占位符行添加提示文本 */
