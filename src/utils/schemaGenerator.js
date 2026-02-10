@@ -140,13 +140,32 @@ function postProcessSchema(schema, options) {
   try {
     let schemaObj = JSON.parse(schema)
     
-    // 展开所有 $ref 引用（在处理其他逻辑之前）
+    // 记录原始 schema 是否有顶层 $ref（quicktype 单样本生成的典型结构）
+    const hadTopLevelRef = !!schemaObj.$ref
+
+    // 如果 schema 使用了顶层 $ref 引用 definitions，先展开顶层引用
+    if (schemaObj.$ref && schemaObj.definitions) {
+      const refName = schemaObj.$ref.replace('#/definitions/', '')
+      if (schemaObj.definitions[refName]) {
+        const definition = schemaObj.definitions[refName]
+        const $schema = schemaObj.$schema
+        const definitions = schemaObj.definitions
+        schemaObj = {
+          $schema,
+          ...definition,
+          definitions
+        }
+      }
+    }
+
+    // 展开所有嵌套的 $ref 引用
     if (schemaObj.definitions) {
       expandRefs(schemaObj, schemaObj.definitions)
     }
-    
-    // 处理多样本生成的情况：没有 $ref 但有多个 definitions
-    if (!schemaObj.$ref && schemaObj.definitions && Object.keys(schemaObj.definitions).length > 0) {
+
+    // 处理多样本生成的情况：原始 schema 没有顶层 $ref 但有多个 definitions
+    // 仅在多样本场景下执行，避免将嵌套对象的 definitions 错误地扁平化到根级别
+    if (!hadTopLevelRef && !schemaObj.$ref && schemaObj.definitions && Object.keys(schemaObj.definitions).length > 0) {
       // 保留原始类型相关属性
       const originalType = schemaObj.type
       const originalItems = schemaObj.items
@@ -176,26 +195,7 @@ function postProcessSchema(schema, options) {
       }
     }
     
-    // 如果 schema 使用了 $ref 引用 definitions，展开它
-    if (schemaObj.$ref && schemaObj.definitions) {
-      const refName = schemaObj.$ref.replace('#/definitions/', '')
-      if (schemaObj.definitions[refName]) {
-        // 合并定义的内容到顶层
-        const definition = schemaObj.definitions[refName]
-        schemaObj = {
-          $schema: schemaObj.$schema,
-          ...definition,
-          definitions: schemaObj.definitions
-        }
-      }
-    }
-    
-    // 再次展开（因为可能在处理 $ref 后又出现了新的 $ref）
-    if (schemaObj.definitions) {
-      expandRefs(schemaObj, schemaObj.definitions)
-    }
-    
-    // 删除 definitions（因为已经展开了）
+    // 删除 definitions（已经展开了）
     delete schemaObj.definitions
     
     // 设置 $schema 版本

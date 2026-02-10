@@ -13,7 +13,7 @@
 import { ref, onMounted, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, StateEffect, StateField } from '@codemirror/state'
-import { Decoration, scrollIntoView } from '@codemirror/view'
+import { Decoration } from '@codemirror/view'
 import { keymap } from '@codemirror/view'
 
 const props = defineProps({
