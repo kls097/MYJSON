@@ -501,14 +501,9 @@ export function serializeValue(value) {
  * @returns {Object} 包含对齐后的左右内容和差异信息
  */
 export function generateAlignedDiff(leftJson, rightJson) {
-  // 调试日志
-  console.log('[Debug generateAlignedDiff] leftJson:', leftJson)
-  console.log('[Debug generateAlignedDiff] rightJson:', rightJson)
-
   try {
     // 如果两边都为空，直接返回
     if (!leftJson.trim() && !rightJson.trim()) {
-      console.log('[Debug generateAlignedDiff] 两边都为空')
       return {
         leftLines: [''],
         rightLines: [''],
@@ -522,7 +517,6 @@ export function generateAlignedDiff(leftJson, rightJson) {
     const rightEmpty = !rightJson.trim()
 
     if (leftEmpty && !rightEmpty) {
-      console.log('[Debug generateAlignedDiff] 左边为空，右边有内容，生成左边全占位符的对齐视图')
       const rightLines = rightJson.split('\n')
       const leftLines = new Array(rightLines.length).fill('')
       const lineTypes = new Array(rightLines.length).fill('added')
@@ -535,7 +529,6 @@ export function generateAlignedDiff(leftJson, rightJson) {
     }
 
     if (!leftEmpty && rightEmpty) {
-      console.log('[Debug generateAlignedDiff] 右边为空，左边有内容，生成右边全占位符的对齐视图')
       const leftLines = leftJson.split('\n')
       const rightLines = new Array(leftLines.length).fill('')
       const lineTypes = new Array(leftLines.length).fill('removed')
@@ -550,9 +543,6 @@ export function generateAlignedDiff(leftJson, rightJson) {
     // 两边都有内容，正常解析并递归对齐
     const leftObj = JSON.parse(leftJson)
     const rightObj = JSON.parse(rightJson)
-
-    console.log('[Debug generateAlignedDiff] leftObj:', leftObj)
-    console.log('[Debug generateAlignedDiff] rightObj:', rightObj)
 
     // 递归生成对齐的行
     const result = alignObjects(leftObj, rightObj, 0)
@@ -678,8 +668,6 @@ function calculateSimilarity(a, b, depth = 0) {
  * 对齐数组
  */
 function alignArrays(leftArr, rightArr, indent) {
-  console.log(`[Debug alignArrays] indent=${indent}, leftArr.length=${leftArr.length}, rightArr.length=${rightArr.length}`)
-
   const leftLines = []
   const rightLines = []
   const lineTypes = []
@@ -816,8 +804,6 @@ function alignArrays(leftArr, rightArr, indent) {
  * 对齐对象属性
  */
 function alignObjectProps(leftObj, rightObj, indent) {
-  console.log(`[Debug alignObjectProps] indent=${indent}, leftKeys=${Object.keys(leftObj).join(',')}, rightKeys=${Object.keys(rightObj).join(',')}`)
-
   const leftLines = []
   const rightLines = []
   const lineTypes = []
@@ -843,8 +829,6 @@ function alignObjectProps(leftObj, rightObj, indent) {
     return rightKeys.indexOf(a) - rightKeys.indexOf(b)
   })
 
-  console.log(`[Debug alignObjectProps] allKeys after sort:`, allKeys)
-
   for (let i = 0; i < allKeys.length; i++) {
     const key = allKeys[i]
     const hasLeft = key in leftObj
@@ -853,7 +837,6 @@ function alignObjectProps(leftObj, rightObj, indent) {
     const comma = isLast ? '' : ','
     const keyStr = `"${key}": `
 
-    console.log(`[Debug alignObjectProps] key=${key}, hasLeft=${hasLeft}, hasRight=${hasRight}`)
 
     if (hasLeft && hasRight) {
       // 两侧都有
@@ -930,9 +913,6 @@ function alignObjectProps(leftObj, rightObj, indent) {
   leftLines.push(`${indentStr}}`)
   rightLines.push(`${indentStr}}`)
   lineTypes.push('equal')
-
-  console.log(`[Debug alignObjectProps] returning: leftLines.length=${leftLines.length}, rightLines.length=${rightLines.length}, lineTypes.length=${lineTypes.length}`)
-  console.log(`[Debug alignObjectProps] lineTypes summary:`, lineTypes.filter(t => t !== 'equal').length, 'non-equal lines')
 
   return { leftLines, rightLines, lineTypes }
 }

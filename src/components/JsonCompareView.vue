@@ -17,6 +17,7 @@
         v-model="leftJson"
         :display-content="alignedLeft"
         side="left"
+        title="左侧 (原始)"
         :diffs="diffs"
         :line-types="lineTypes"
         :current-diff-index="currentDiffIndex"
@@ -32,6 +33,7 @@
         v-model="rightJson"
         :display-content="alignedRight"
         side="right"
+        title="右侧 (对比)"
         :diffs="diffs"
         :line-types="lineTypes"
         :current-diff-index="currentDiffIndex"
@@ -102,14 +104,29 @@ const scrollState = reactive({
   right: { scrollTop: 0, scrollLeft: 0 }
 })
 
+// 滚动锁：防止左右编辑器滚动事件互相触发导致无限循环
+let scrollSource = null
+
 // 处理滚动同步
 const handleScroll = (e) => {
   const { side, scrollTop, scrollLeft } = e
+
+  // 如果这次滚动是由另一侧同步触发的，忽略它
+  if (scrollSource && scrollSource !== side) {
+    return
+  }
+
+  scrollSource = side
   const otherSide = side === 'left' ? 'right' : 'left'
 
   // 同步到另一侧
   scrollState[otherSide].scrollTop = scrollTop
   scrollState[otherSide].scrollLeft = scrollLeft
+
+  // 在下一帧释放锁
+  requestAnimationFrame(() => {
+    scrollSource = null
+  })
 }
 
 // 初始化数据
@@ -152,7 +169,6 @@ const handleCompareImmediate = () => {
 
 // 用户编辑完成后触发重新比较
 const handleUserEditComplete = () => {
-  console.log('[Debug JsonCompareView] handleUserEditComplete called')
   // 延迟一点以确保所有状态都已更新
   setTimeout(() => {
     compareImmediate()

@@ -22,10 +22,6 @@ export function useJsonComparison() {
     const leftLines = alignedLeft.value.split('\n')
     const rightLines = alignedRight.value.split('\n')
 
-    console.log('[Debug calculateAlignedRanges] types:', types)
-    console.log('[Debug calculateAlignedRanges] leftLines.length:', leftLines.length)
-    console.log('[Debug calculateAlignedRanges] rightLines.length:', rightLines.length)
-
     let i = 0
     while (i < types.length) {
       const type = types[i]
@@ -44,8 +40,6 @@ export function useJsonComparison() {
       while (endLine < types.length && types[endLine] === type) {
         endLine++
       }
-
-      console.log(`[Debug calculateAlignedRanges] Found ${type} block from ${startLine} to ${endLine - 1}`)
 
       // 计算这个连续块的起始位置
       const leftCharPos = getCharPosForLine(leftLines, startLine)
@@ -67,7 +61,6 @@ export function useJsonComparison() {
             break
           }
         }
-        console.log(`[Debug calculateAlignedRanges] hasLeftContent: ${hasLeftContent}`)
         if (hasLeftContent) {
           // 找到最后一行有内容的位置
           let lastContentLine = startLine
@@ -83,7 +76,6 @@ export function useJsonComparison() {
             line: startLine,
             endLine: lastContentLine
           }
-          console.log(`[Debug calculateAlignedRanges] leftRange:`, leftRange)
         }
       }
 
@@ -96,7 +88,6 @@ export function useJsonComparison() {
             break
           }
         }
-        console.log(`[Debug calculateAlignedRanges] hasRightContent: ${hasRightContent}`)
         if (hasRightContent) {
           // 找到最后一行有内容的位置
           let lastContentLine = startLine
@@ -112,27 +103,38 @@ export function useJsonComparison() {
             line: startLine,
             endLine: lastContentLine
           }
-          console.log(`[Debug calculateAlignedRanges] rightRange:`, rightRange)
         }
       }
 
       // 至少一侧有实际内容才添加到结果
       if (leftRange || rightRange) {
+        // 从差异行内容中提取路径信息
+        const contentLines = type === 'added' ? rightLines : leftLines
+        let path = ''
+        for (let j = startLine; j < endLine; j++) {
+          const line = contentLines[j]
+          if (line && line.trim()) {
+            const keyMatch = line.match(/^\s*"([^"]+)"\s*:/)
+            if (keyMatch) {
+              path = keyMatch[1]
+              break
+            }
+          }
+        }
+
         result.push({
           type,
           line: startLine,
           endLine: Math.max(leftRange?.endLine ?? startLine, rightRange?.endLine ?? startLine),
           leftRange,
-          rightRange
+          rightRange,
+          path: path || `Line ${startLine + 1}`
         })
-      } else {
-        console.log(`[Debug calculateAlignedRanges] Skipping block - no content found`)
       }
 
       i = endLine
     }
 
-    console.log('[Debug calculateAlignedRanges] result:', result)
     return result
   }
 
@@ -265,7 +267,7 @@ export function useJsonComparison() {
   const stats = computed(() => {
     const added = diffs.value.filter(d => d.type === 'added').length
     const removed = diffs.value.filter(d => d.type === 'removed').length
-    const modified = diffs.value.filter(d => d.type === 'modified' || d.type === 'type-changed').length
+    const modified = diffs.value.filter(d => d.type === 'modified').length
 
     return {
       total: diffs.value.length,
@@ -286,27 +288,24 @@ export function useJsonComparison() {
     return !compareError.value && (leftJson.value.trim() || rightJson.value.trim())
   })
 
-  // 立即比较（跳过 debounce）
-  const compareImmediate = () => {
-    console.log('[Debug Compare] *** compareImmediate() called ***')
-    compare()
-  }
-
   // 监听 JSON 变化自动重新比较
   let debounceTimer = null
   let skipNextCompare = false
+
+  // 立即比较（跳过 debounce）
+  const compareImmediate = () => {
+    // 清除待执行的 debounce 比较，防止双重触发
+    clearTimeout(debounceTimer)
+    debounceTimer = null
+    compare()
+  }
 
   const compare = () => {
     // 每次比较前清除错误状态
     compareError.value = ''
 
-    console.log('[Debug Compare] *** compare() called ***')
-    console.log('[Debug Compare] leftJson:', leftJson.value?.substring(0, 100))
-    console.log('[Debug Compare] rightJson:', rightJson.value?.substring(0, 100))
-
     // 清空时重置
     if (!leftJson.value.trim() && !rightJson.value.trim()) {
-      console.log('[Debug Compare] Both empty, resetting')
       diffs.value = []
       currentDiffIndex.value = 0
       alignedLeft.value = ''
@@ -320,44 +319,26 @@ export function useJsonComparison() {
       let leftObj, rightObj
       let leftValid = true, rightValid = true
 
-      console.log('[Debug Compare] Parsing JSON...')
-
       try {
         leftObj = leftJson.value.trim() ? JSON.parse(leftJson.value) : {}
-        console.log('[Debug Compare] leftJson parsed successfully, content:', leftJson.value?.substring(0, 200))
       } catch (error) {
         leftValid = false
         leftObj = null
-        console.log('[Debug Compare] leftJson parse failed:', error.message)
-        console.log('[Debug Compare] leftJson content:', leftJson.value)
       }
 
       try {
         rightObj = rightJson.value.trim() ? JSON.parse(rightJson.value) : {}
-        console.log('[Debug Compare] rightJson parsed successfully')
       } catch (error) {
         rightValid = false
         rightObj = null
-        console.log('[Debug Compare] rightJson parse failed:', error.message)
       }
-
-      console.log('[Debug Compare] leftValid:', leftValid, 'rightValid:', rightValid)
 
       // 如果两边都有效，执行深度比较
       if (leftValid && rightValid) {
-        console.log('[Debug Compare] Calling compareJson...')
         const rawDiffs = compareJson(leftObj, rightObj)
-        console.log('[Debug Compare] compareJson returned, diffs:', rawDiffs.length)
 
         // 生成对齐的diff视图
-        console.log('[Debug Compare] Calling generateAlignedDiff...')
         const aligned = generateAlignedDiff(leftJson.value, rightJson.value)
-        console.log('[Debug Compare] generateAlignedDiff returned')
-
-        console.log('[Debug Compare] aligned.leftLines:', aligned.leftLines)
-        console.log('[Debug Compare] aligned.rightLines:', aligned.rightLines)
-        console.log('[Debug Compare] aligned.lineTypes:', aligned.lineTypes)
-        console.log('[Debug Compare] aligned.success:', aligned.success)
 
         if (aligned.success) {
           alignedLeft.value = aligned.leftLines.join('\n')
@@ -376,28 +357,24 @@ export function useJsonComparison() {
         // 重置到第一个差异
         currentDiffIndex.value = diffs.value.length > 0 ? 0 : -1
 
-        console.log('[Debug Compare] Comparison successful, diffs:', diffs.value.length)
         return { success: true, count: diffs.value.length }
       }
 
       // 有一边或两边无效 - 保持当前视图不变，不刷新焦点
       if (!leftValid && !rightValid) {
         // 格式错误时保持静默，不更新显示内容，保持光标位置
-        console.log('[Debug Compare] Both invalid, keeping current state')
         return { success: false, count: 0, keepState: true }
       }
 
       // 只有左侧有效
       if (!leftValid && rightValid) {
         // 格式错误时保持静默，不更新显示内容，保持光标位置
-        console.log('[Debug Compare] Left invalid, keeping current state')
         return { success: false, count: 0, keepState: true }
       }
 
       // 只有右侧有效
       if (leftValid && !rightValid) {
         // 格式错误时保持静默，不更新显示内容，保持光标位置
-        console.log('[Debug Compare] Right invalid, keeping current state')
         return { success: false, count: 0, keepState: true }
       }
     } catch (error) {
