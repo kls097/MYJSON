@@ -22,9 +22,10 @@
         :has-content="!!currentJson"
         :show-query="showQueryPanel"
         :show-convert="showConvertPanel"
+        :show-schema="showSchemaPanel"
         :view-mode="currentViewMode"
-        :can-undo="canUndo"
-        :can-redo="canRedo"
+        :can-undo="false"
+        :can-redo="false"
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
         @format="handleFormat"
@@ -36,14 +37,13 @@
         @toggle-history="showHistory = !showHistory"
         @toggle-query="showQueryPanel = !showQueryPanel"
         @toggle-convert="showConvertPanel = !showConvertPanel"
+        @toggle-schema="showSchemaPanel = !showSchemaPanel"
         @change-view="handleViewChange"
         @import-json="handleImportJson"
         @save-to-local="handleSaveToLocal"
         @import-excel="handleImportExcel"
         @export-excel="handleExportExcel"
         @open-compare="handleOpenCompare"
-        @undo="handleUndo"
-        @redo="handleRedo"
       />
 
       <div class="main-content">
@@ -99,6 +99,14 @@
         @compare-with-current="handleCompareWithCurrent"
       />
 
+      <SchemaValidatorPanel
+        v-if="showSchemaPanel"
+        :current-json="currentJson"
+        @close="showSchemaPanel = false"
+        @apply-mock="handleApplyMock"
+        @jump-to-error="handleJumpToError"
+      />
+
       <SaveDialog
         :is-open="showSaveDialog"
         :default-name="defaultSaveName"
@@ -128,6 +136,7 @@ import StatusBar from './components/StatusBar.vue'
 import SaveDialog from './components/SaveDialog.vue'
 import JsonCompareView from './components/JsonCompareView.vue'
 import TableView from './components/TableView.vue'
+import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
 import { useJsonStorage } from './composables/useJsonStorage'
 import { useClipboard } from './composables/useClipboard'
@@ -155,6 +164,7 @@ const showHistory = ref(false)
 const showSaveDialog = ref(false)
 const showQueryPanel = ref(false)  // 默认隐藏查询面板
 const showConvertPanel = ref(false)  // 默认隐藏转换面板
+const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
@@ -347,35 +357,12 @@ const handleKeydown = (event) => {
     event.preventDefault()
     handleSave()
   }
-  // Ctrl+Z 或 Cmd+Z (Mac) - 撤销
-  if ((event.ctrlKey || event.metaKey) && event.key === 'z' && !event.shiftKey) {
-    event.preventDefault()
-    handleUndo()
-  }
-  // Ctrl+Y 或 Cmd+Shift+Z (Mac) - 重做
-  if ((event.ctrlKey || event.metaKey) && (event.key === 'y' || (event.key === 'z' && event.shiftKey))) {
-    event.preventDefault()
-    handleRedo()
-  }
+  // 移除 Ctrl+Z 和 Ctrl+Y 的全局拦截，让 CodeMirror 的原生撤销/重做生效
 }
 
-// 撤销操作
-const handleUndo = () => {
-  const content = undo()
-  if (content !== null) {
-    currentJson.value = content
-    validate()
-  }
-}
-
-// 重做操作
-const handleRedo = () => {
-  const content = redo()
-  if (content !== null) {
-    currentJson.value = content
-    validate()
-  }
-}
+// 注意：撤销/重做功能已改为使用 CodeMirror 的原生功能
+// useHistory 现在仅用于记录重要操作（格式化、压缩等）的历史
+// 不再通过快捷键触发，让编辑器自己处理 Ctrl+Z/Ctrl+Y
 
 // 清理事件监听器
 onUnmounted(() => {
@@ -1084,6 +1071,29 @@ const handleSaveToLocal = () => {
     console.error('保存到本地失败:', error)
     alert(`保存失败: ${error.message}`)
   }
+}
+
+// ============ Schema 面板相关方法 ============
+
+/**
+ * 应用 Mock 数据到编辑器
+ * @param {string} mockData - Mock JSON 字符串
+ */
+const handleApplyMock = (mockData) => {
+  if (mockData) {
+    currentJson.value = mockData
+    pushHistory(currentJson.value)
+  }
+}
+
+/**
+ * 跳转到错误位置
+ * @param {Object} error - 错误对象
+ */
+const handleJumpToError = (error) => {
+  // 可以实现跳转到编辑器特定行的逻辑
+  // 目前只是简单的提示
+  console.log('跳转到错误:', error)
 }
 </script>
 

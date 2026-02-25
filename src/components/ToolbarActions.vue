@@ -1,23 +1,6 @@
 <template>
   <div class="toolbar">
-    <div class="toolbar-section undo-redo-section">
-      <button 
-        class="btn btn-icon" 
-        @click="$emit('undo')" 
-        :disabled="!canUndo"
-        title="撤销 (Ctrl+Z)"
-      >
-        ↶
-      </button>
-      <button 
-        class="btn btn-icon" 
-        @click="$emit('redo')" 
-        :disabled="!canRedo"
-        title="重做 (Ctrl+Y)"
-      >
-        ↷
-      </button>
-    </div>
+    <!-- 撤销/重做功能已移除，使用 CodeMirror 的原生撤销/重做 -->
 
     <div class="toolbar-section view-section">
       <div class="dropdown" ref="viewDropdownRef">
@@ -115,6 +98,14 @@
       <button class="btn btn-sm btn-secondary" @click="$emit('toggle-convert')" title="显示/隐藏转换面板">
         {{ showConvert ? '隐藏转换' : '转换' }}
       </button>
+      <button 
+        class="btn btn-sm btn-schema" 
+        @click="$emit('toggle-schema')" 
+        :class="{ active: showSchema }"
+        title="Schema 工作台"
+      >
+        {{ showSchema ? '隐藏Schema' : 'Schema' }}
+      </button>
     </div>
 
     <div class="toolbar-section dropdown-section">
@@ -179,17 +170,13 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  showSchema: {
+    type: Boolean,
+    default: false
+  },
   viewMode: {
     type: String,
     default: 'code'
-  },
-  canUndo: {
-    type: Boolean,
-    default: false
-  },
-  canRedo: {
-    type: Boolean,
-    default: false
   },
   needsFix: {
     type: Boolean,
@@ -221,14 +208,13 @@ const emit = defineEmits([
   'toggle-history',
   'toggle-query',
   'toggle-convert',
+  'toggle-schema',
   'change-view',
   'import-json',
   'save-to-local',
   'import-excel',
   'export-excel',
-  'open-compare',
-  'undo',
-  'redo'
+  'open-compare'
 ])
 
 const showDropdown = ref(false)
@@ -465,5 +451,23 @@ onUnmounted(() => {
   font-size: 11px;
   opacity: 0.5;
   flex-shrink: 0;
+}
+
+/* Schema 按钮 */
+.btn-schema {
+  background: #6f42c1;
+  border-color: #6f42c1;
+  color: white;
+}
+
+.btn-schema:hover {
+  background: #5a32a3;
+  border-color: #5a32a3;
+}
+
+.btn-schema.active {
+  background: #5a32a3;
+  border-color: #5a32a3;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 </style>
