@@ -14,6 +14,7 @@
 
     <div class="compare-editors">
       <CompareEditor
+        ref="leftEditorRef"
         v-model="leftJson"
         :display-content="alignedLeft"
         side="left"
@@ -30,6 +31,7 @@
       <div class="compare-divider"></div>
 
       <CompareEditor
+        ref="rightEditorRef"
         v-model="rightJson"
         :display-content="alignedRight"
         side="right"
@@ -75,6 +77,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close'])
+
+// 编辑器组件引用
+const leftEditorRef = ref(null)
+const rightEditorRef = ref(null)
 
 // 使用比较 composable
 const {
@@ -140,11 +146,16 @@ onMounted(() => {
 
 // 事件处理
 const handleFormat = () => {
-  formatBoth()
+  // 直接从编辑器读取原始内容，避免使用可能被 extractOriginalJson 损坏的 reactive 值
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  formatBoth(rawLeft, rawRight)
 }
 
 const handleSort = () => {
-  sortBoth()
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  sortBoth(rawLeft, rawRight)
 }
 
 const handleSwap = () => {

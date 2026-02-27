@@ -73,13 +73,21 @@ const extractOriginalJson = () => {
 
   // 使用对齐后的内容（displayContent）
   const alignedContent = props.displayContent || ''
-  
+
   // 如果编辑器内容与对齐内容不同，说明用户编辑了
-  // 仍然需要根据 lineTypes 过滤占位符行，避免空行被当作 JSON 内容
   if (editorContent !== alignedContent) {
     const editorLines = editorContent.split('\n')
     // 如果行数与 lineTypes 匹配，按类型过滤占位符行
+    // 但首先检测是否是全量替换（粘贴操作）：
+    // 如果内容与上次的 displayContent 差异巨大，说明用户粘贴了全新内容
     if (editorLines.length === props.lineTypes.length) {
+      // 检查内容是否与 alignedContent 相似度很低（全量替换检测）
+      // 如果编辑器内容长度变化超过 80%，视为全量替换
+      const lenDiff = Math.abs(editorContent.length - alignedContent.length)
+      const maxLen = Math.max(editorContent.length, alignedContent.length, 1)
+      if (lenDiff / maxLen > 0.8) {
+        return editorContent
+      }
       const filtered = []
       for (let i = 0; i < editorLines.length; i++) {
         const type = props.lineTypes[i]
@@ -110,10 +118,8 @@ const extractOriginalJson = () => {
   const allPlaceholder = lines.every((line, i) => {
     const type = props.lineTypes[i]
     if (type === 'removed') {
-      // 检查左侧行是否为空
       return props.side === 'left' ? line.trim() === '' : false
     } else if (type === 'added') {
-      // 检查右侧行是否为空
       return props.side === 'right' ? line.trim() === '' : false
     } else {
       return false
@@ -134,24 +140,19 @@ const extractOriginalJson = () => {
     if (type === 'equal') {
       originalLines.push(line)
     } else if (type === 'removed') {
-      // 左侧有内容，提取左侧的原始内容
       if (props.side === 'left' && line.trim() !== '') {
         originalLines.push(line)
       }
     } else if (type === 'added') {
-      // 右侧有内容，提取右侧的原始内容
       if (props.side === 'right' && line.trim() !== '') {
         originalLines.push(line)
       }
     } else {
-      // 其他情况（modified）：
       originalLines.push(line)
     }
   }
 
-  const result = originalLines.length > 0 ? originalLines.join('\n') : ''
-
-  return result
+  return originalLines.length > 0 ? originalLines.join('\n') : ''
 }
 
 // 创建装饰集 - 基于 lineTypes
@@ -264,7 +265,6 @@ onMounted(() => {
               return
             }
             isUserEditing = true
-            const newContent = update.state.doc.toString()
             // 当用户编辑时，提取原始 JSON（去掉占位符行）并更新
             const originalContent = extractOriginalJson()
             emit('update:modelValue', originalContent)
@@ -389,6 +389,11 @@ watch(() => props.currentDiffIndex, (newIndex) => {
       }
     }
   }
+})
+
+// 暴露方法给父组件，允许直接读取编辑器的原始内容
+defineExpose({
+  getRawContent: () => editorView ? editorView.state.doc.toString() : ''
 })
 </script>
 
