@@ -10,6 +10,9 @@
       <button @click="$emit('swap')" class="btn btn-sm" title="交换左右两边">
         ⇄ 交换
       </button>
+      <button @click="$emit('compare-immediate')" class="btn btn-sm" title="重新比较">
+        重新比较
+      </button>
     </div>
 
     <div class="toolbar-group">
@@ -59,7 +62,7 @@ defineProps({
   }
 })
 
-defineEmits(['format', 'sort', 'swap', 'prev', 'next', 'close'])
+defineEmits(['format', 'sort', 'swap', 'compare-immediate', 'prev', 'next', 'close'])
 </script>
 
 <style scoped>

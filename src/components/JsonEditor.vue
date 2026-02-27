@@ -44,6 +44,8 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { json } from '@codemirror/lang-json'
 import { lintGutter, linter } from '@codemirror/lint'
+import { search, searchKeymap, SearchQuery, getSearchQuery, setSearchQuery, findNext, findPrevious, closeSearchPanel, SearchCursor } from '@codemirror/search'
+import { keymap } from '@codemirror/view'
 import { useClipboard } from '../composables/useClipboard'
 
 const props = defineProps({
@@ -70,6 +72,184 @@ const currentPath = ref('')
 const canExtractPath = ref(false)
 
 const { copyToClipboard } = useClipboard()
+
+// 计算搜索匹配数量
+function countMatches(state, query) {
+  let count = 0
+  let currentIdx = -1
+  const cursor = query.getCursor(state.doc)
+  const sel = state.selection.main
+  while (!cursor.next().done) {
+    count++
+    if (currentIdx < 0 && cursor.value.from <= sel.from && cursor.value.to >= sel.from) {
+      currentIdx = count
+    }
+  }
+  return { count, currentIdx }
+}
+
+// 创建自定义搜索面板
+function createSearchPanel(view) {
+  const dom = document.createElement('div')
+  dom.className = 'cm-search-panel'
+
+  const searchField = document.createElement('input')
+  searchField.className = 'cm-search-field'
+  searchField.placeholder = '搜索...'
+  searchField.setAttribute('main-field', 'true')
+  searchField.setAttribute('name', 'search')
+  searchField.setAttribute('form', '')
+
+  const countDisplay = document.createElement('span')
+  countDisplay.className = 'cm-search-count'
+  countDisplay.textContent = ''
+
+  const prevBtn = document.createElement('button')
+  prevBtn.className = 'cm-search-btn'
+  prevBtn.textContent = '▲'
+  prevBtn.title = '上一个 (Shift+Enter)'
+  prevBtn.type = 'button'
+
+  const nextBtn = document.createElement('button')
+  nextBtn.className = 'cm-search-btn'
+  nextBtn.textContent = '▼'
+  nextBtn.title = '下一个 (Enter)'
+  nextBtn.type = 'button'
+
+  const caseBtn = document.createElement('button')
+  caseBtn.className = 'cm-search-btn cm-search-toggle'
+  caseBtn.textContent = 'Aa'
+  caseBtn.title = '区分大小写'
+  caseBtn.type = 'button'
+
+  const reBtn = document.createElement('button')
+  reBtn.className = 'cm-search-btn cm-search-toggle'
+  reBtn.textContent = '.*'
+  reBtn.title = '正则表达式'
+  reBtn.type = 'button'
+
+  const closeBtn = document.createElement('button')
+  closeBtn.className = 'cm-search-btn cm-search-close'
+  closeBtn.textContent = '✕'
+  closeBtn.title = '关闭 (Escape)'
+  closeBtn.type = 'button'
+
+  dom.appendChild(searchField)
+  dom.appendChild(countDisplay)
+  dom.appendChild(prevBtn)
+  dom.appendChild(nextBtn)
+  dom.appendChild(caseBtn)
+  dom.appendChild(reBtn)
+  dom.appendChild(closeBtn)
+
+  let caseSensitive = false
+  let regexp = false
+
+  function updateCount() {
+    const query = getSearchQuery(view.state)
+    if (!query.valid) {
+      countDisplay.textContent = ''
+      return
+    }
+    const { count, currentIdx } = countMatches(view.state, query)
+    if (count === 0) {
+      countDisplay.textContent = searchField.value ? '无匹配' : ''
+      countDisplay.className = 'cm-search-count no-match'
+    } else {
+      countDisplay.textContent = currentIdx > 0 ? `${currentIdx} / ${count}` : `${count} 个匹配`
+      countDisplay.className = 'cm-search-count'
+    }
+  }
+
+  function commit() {
+    const query = new SearchQuery({
+      search: searchField.value,
+      caseSensitive,
+      regexp
+    })
+    view.dispatch({ effects: setSearchQuery.of(query) })
+    requestAnimationFrame(updateCount)
+  }
+
+  searchField.addEventListener('input', commit)
+  searchField.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      if (e.shiftKey) {
+        findPrevious(view)
+      } else {
+        findNext(view)
+      }
+      requestAnimationFrame(updateCount)
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      closeSearchPanel(view)
+      view.focus()
+    }
+  })
+
+  prevBtn.addEventListener('click', () => {
+    findPrevious(view)
+    requestAnimationFrame(updateCount)
+  })
+  nextBtn.addEventListener('click', () => {
+    findNext(view)
+    requestAnimationFrame(updateCount)
+  })
+
+  caseBtn.addEventListener('click', () => {
+    caseSensitive = !caseSensitive
+    caseBtn.classList.toggle('active', caseSensitive)
+    commit()
+  })
+  reBtn.addEventListener('click', () => {
+    regexp = !regexp
+    reBtn.classList.toggle('active', regexp)
+    commit()
+  })
+
+  closeBtn.addEventListener('click', () => {
+    closeSearchPanel(view)
+    view.focus()
+  })
+
+  // 初始化：从当前搜索状态恢复
+  const currentQuery = getSearchQuery(view.state).spec
+  if (currentQuery.search) {
+    searchField.value = currentQuery.search
+    caseSensitive = currentQuery.caseSensitive || false
+    regexp = currentQuery.regexp || false
+    caseBtn.classList.toggle('active', caseSensitive)
+    reBtn.classList.toggle('active', regexp)
+  }
+  requestAnimationFrame(updateCount)
+
+  return {
+    dom,
+    top: true,
+    mount() {
+      searchField.focus()
+      searchField.select()
+    },
+    update(update) {
+      if (update.docChanged || update.selectionSet) {
+        updateCount()
+      }
+      // 响应外部 setSearchQuery
+      for (const tr of update.transactions) {
+        for (const effect of tr.effects) {
+          if (effect.is(setSearchQuery)) {
+            const q = getSearchQuery(view.state).spec
+            if (q.search !== searchField.value) {
+              searchField.value = q.search || ''
+            }
+            requestAnimationFrame(updateCount)
+          }
+        }
+      }
+    }
+  }
+}
 
 // 根据光标位置计算 JSON 路径
 const getJsonPathAtPosition = (content, position) => {
@@ -375,6 +555,7 @@ onMounted(() => {
       json(),
       lintGutter(),
       jsonLinter,
+      search({ top: true, createPanel: createSearchPanel }),
       EditorView.updateListener.of(update => {
         if (update.docChanged) {
           const content = update.state.doc.toString()
@@ -534,5 +715,89 @@ const validateJson = (content) => {
 .context-menu-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 自定义搜索面板样式 */
+.editor-container :deep(.cm-search-panel) {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-secondary, #f5f5f5);
+  border-bottom: 1px solid var(--border, #ddd);
+  font-size: 13px;
+  flex-wrap: nowrap;
+}
+
+.editor-container :deep(.cm-search-field) {
+  flex: 0 1 240px;
+  min-width: 120px;
+  padding: 4px 8px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 4px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+  font-size: 13px;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.editor-container :deep(.cm-search-field:focus) {
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.editor-container :deep(.cm-search-count) {
+  font-size: 12px;
+  color: var(--text-secondary, #666);
+  white-space: nowrap;
+  min-width: 70px;
+  text-align: center;
+}
+
+.editor-container :deep(.cm-search-count.no-match) {
+  color: #e74c3c;
+}
+
+.editor-container :deep(.cm-search-btn) {
+  padding: 3px 8px;
+  border: 1px solid var(--border, #ccc);
+  border-radius: 4px;
+  background: var(--bg-primary, #fff);
+  color: var(--text-primary, #333);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  transition: background-color 0.2s;
+}
+
+.editor-container :deep(.cm-search-btn:hover) {
+  background: var(--bg-hover, #e8e8e8);
+}
+
+.editor-container :deep(.cm-search-toggle.active) {
+  background: var(--accent-color, #4a9eff);
+  color: #fff;
+  border-color: var(--accent-color, #4a9eff);
+}
+
+.editor-container :deep(.cm-search-close) {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-secondary, #999);
+}
+
+.editor-container :deep(.cm-search-close:hover) {
+  color: var(--text-primary, #333);
+  background: transparent;
+}
+
+/* 隐藏 CodeMirror 默认搜索面板样式（如果有残留） */
+.editor-container :deep(.cm-panel.cm-search) {
+  padding: 0;
+  background: none;
+  border: none;
 }
 </style>

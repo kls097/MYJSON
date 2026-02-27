@@ -14,7 +14,6 @@ import { ref, onMounted, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, StateEffect, StateField } from '@codemirror/state'
 import { Decoration } from '@codemirror/view'
-import { keymap } from '@codemirror/view'
 
 const props = defineProps({
   modelValue: String,
@@ -68,7 +67,6 @@ const extractOriginalJson = () => {
 
   // 如果没有 lineTypes，直接返回编辑器内容
   if (!props.lineTypes || props.lineTypes.length === 0) {
-    console.log(`[Debug CompareEditor ${props.side}] extractOriginalJson - 没有 lineTypes，使用编辑器内容:`, editorContent?.substring(0, 100))
     return editorContent
   }
 
@@ -76,9 +74,24 @@ const extractOriginalJson = () => {
   const alignedContent = props.displayContent || ''
   
   // 如果编辑器内容与对齐内容不同，说明用户编辑了
-  // 这时直接返回编辑器内容，不依赖过时的 lineTypes
+  // 仍然需要根据 lineTypes 过滤占位符行，避免空行被当作 JSON 内容
   if (editorContent !== alignedContent) {
-    console.log(`[Debug CompareEditor ${props.side}] extractOriginalJson - 用户编辑了，返回编辑器内容:`, editorContent?.substring(0, 100))
+    const editorLines = editorContent.split('\n')
+    // 如果行数与 lineTypes 匹配，按类型过滤占位符行
+    if (editorLines.length === props.lineTypes.length) {
+      const filtered = []
+      for (let i = 0; i < editorLines.length; i++) {
+        const type = props.lineTypes[i]
+        const isPlaceholder =
+          (type === 'added' && props.side === 'left') ||
+          (type === 'removed' && props.side === 'right')
+        if (!isPlaceholder) {
+          filtered.push(editorLines[i])
+        }
+      }
+      return filtered.join('\n')
+    }
+    // 行数不匹配时回退到直接返回
     return editorContent
   }
 
@@ -86,7 +99,6 @@ const extractOriginalJson = () => {
   const allEqual = props.lineTypes.every(type => type === 'equal')
   if (allEqual) {
     // 如果全部相同，直接返回编辑器内容
-    console.log(`[Debug CompareEditor ${props.side}] extractOriginalJson - 全部相同，返回编辑器内容:`, editorContent?.substring(0, 100))
     return editorContent
   }
 
@@ -109,7 +121,6 @@ const extractOriginalJson = () => {
 
   // 如果全是占位符行，说明这一侧为空
   if (allPlaceholder) {
-    console.log(`[Debug CompareEditor ${props.side}] extractOriginalJson - 全是占位符行，返回空字符串`)
     return ''
   }
 
@@ -138,7 +149,6 @@ const extractOriginalJson = () => {
   }
 
   const result = originalLines.length > 0 ? originalLines.join('\n') : ''
-  console.log(`[Debug CompareEditor ${props.side}] extractOriginalJson - 提取行数=${originalLines.length}, 前100字符:`, result.substring(0, 100))
 
   return result
 }
@@ -314,12 +324,8 @@ watch(() => props.displayContent, (newValue) => {
 
   // 如果用户正在编辑，跳过更新以避免覆盖用户输入
   if (isUserEditing) {
-    console.log(`[Debug CompareEditor ${props.side}] displayContent changed - 用户正在编辑，跳过更新`)
     return
   }
-
-  // 调试日志
-  console.log(`[Debug CompareEditor ${props.side}] displayContent changed - newValue:`, newValue)
 
   const currentContent = editorView.state.doc.toString()
   if (currentContent !== newValue) {
@@ -346,9 +352,34 @@ watch(() => props.diffs, () => {
   updateDecorations()
 }, { deep: true })
 
-// 监听 currentDiffIndex 变化
-watch(() => props.currentDiffIndex, () => {
+// 监听 currentDiffIndex 变化 - 滚动到当前差异位置
+watch(() => props.currentDiffIndex, (newIndex) => {
   updateDecorations()
+  
+  // BUG FIX: 滚动到当前差异位置
+  if (editorView && props.diffs && props.diffs[newIndex]) {
+    const diff = props.diffs[newIndex]
+    const targetLine = diff.line  // 0-based line number from diff
+    
+    if (targetLine >= 0 && targetLine < props.lineTypes?.length) {
+      // 找到对应的 CodeMirror 行 (CodeMirror 使用 1-based 行号)
+      const cmLineNumber = targetLine + 1
+      
+      if (cmLineNumber <= editorView.state.doc.lines) {
+        const line = editorView.state.doc.line(cmLineNumber)
+        
+        // 使用 scrollIntoView 效果滚动到行中间
+        const scrollEffect = EditorView.scrollIntoView(line.from, {
+          y: 'center',
+          x: 'start'
+        })
+        
+        editorView.dispatch({
+          effects: scrollEffect
+        })
+      }
+    }
+  }
 })
 </script>
 
@@ -421,11 +452,23 @@ watch(() => props.currentDiffIndex, () => {
   padding-left: 2px !important;
 }
 
-/* 占位符行样式 */
+/* 占位符行样式 - BUG FIX: 确保高度与正常行一致 */
 :deep(.cm-diff-placeholder) {
   background-color: #f5f5f5 !important;
   position: relative;
-  color: transparent !important; /* 隐藏原始内容 */
+  min-height: 20px !important; /* 确保最小高度与 CodeMirror 行高一致 */
+}
+
+:deep(.cm-diff-placeholder .cm-line) {
+  color: transparent !important;
+  min-height: 20px !important;
+  line-height: 20px !important;
+}
+
+/* 确保所有行高度一致 */
+:deep(.cm-line) {
+  min-height: 20px !important;
+  line-height: 20px !important;
 }
 
 /* 为占位符行添加提示文本 */
