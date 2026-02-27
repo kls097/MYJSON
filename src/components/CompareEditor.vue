@@ -35,6 +35,7 @@ let editorView = null
 let scrollerElement = null
 let scrollTimeout = null
 let isUserEditing = false // 跟踪用户是否正在编辑
+let isProgrammaticUpdate = false // 跟踪是否是程序更新（非用户编辑）
 
 // 当前装饰集的响应式引用
 const currentDecorations = ref(Decoration.none)
@@ -258,6 +259,10 @@ onMounted(() => {
         decorationField, // 使用 StateField 管理装饰器
         EditorView.updateListener.of((update) => {
           if (update.docChanged) {
+            // 如果是程序更新（displayContent 同步），不触发 modelValue 更新
+            if (isProgrammaticUpdate) {
+              return
+            }
             isUserEditing = true
             const newContent = update.state.doc.toString()
             // 当用户编辑时，提取原始 JSON（去掉占位符行）并更新
@@ -308,6 +313,7 @@ watch(() => props.modelValue, (newValue) => {
   if (props.displayContent) return
 
   if (editorView && editorView.state.doc.toString() !== newValue) {
+    isProgrammaticUpdate = true
     editorView.dispatch({
       changes: {
         from: 0,
@@ -315,6 +321,7 @@ watch(() => props.modelValue, (newValue) => {
         insert: newValue
       }
     })
+    isProgrammaticUpdate = false
   }
 })
 
@@ -329,6 +336,7 @@ watch(() => props.displayContent, (newValue) => {
 
   const currentContent = editorView.state.doc.toString()
   if (currentContent !== newValue) {
+    isProgrammaticUpdate = true
     editorView.dispatch({
       changes: {
         from: 0,
@@ -336,6 +344,7 @@ watch(() => props.displayContent, (newValue) => {
         insert: newValue
       }
     })
+    isProgrammaticUpdate = false
   }
 
   // 更新装饰器
