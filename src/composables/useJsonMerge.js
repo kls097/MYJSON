@@ -1,5 +1,5 @@
 // JSON 合并逻辑 Composable
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import {
   deepMerge,
   overrideMerge,
@@ -13,13 +13,14 @@ export function useJsonMerge() {
   const leftJson = ref('')
   const rightJson = ref('')
   const baseJson = ref('')
-  
+
   // 合并策略
   const mergeStrategy = ref('deep') // deep / override
   const arrayStrategy = ref('append') // append / dedupe / replace
-  
+
   // 合并结果
   const mergeResult = ref(null)
+  const mergeChanges = ref(null) // 存储合并变更类型: added/modified/unchanged
   const conflicts = ref([])
   const threeWayStatus = ref(null)
   
@@ -58,14 +59,15 @@ export function useJsonMerge() {
   function executeMerge() {
     error.value = null
     conflicts.value = []
-    
+    mergeChanges.value = null
+
     // 解析 JSON
     const left = parseJson(leftJson.value)
     const right = parseJson(rightJson.value)
-    
+
     isValidLeft.value = left.valid
     isValidRight.value = right.valid
-    
+
     if (!left.valid) {
       error.value = `左侧 JSON 解析错误: ${left.error}`
       return null
@@ -74,7 +76,7 @@ export function useJsonMerge() {
       error.value = `右侧 JSON 解析错误: ${right.error}`
       return null
     }
-    
+
     // 执行合并
     try {
       let result
@@ -83,14 +85,81 @@ export function useJsonMerge() {
       } else {
         result = overrideMerge(left.data, right.data)
       }
-      
+
       mergeResult.value = result.result
       conflicts.value = result.conflicts
-      
+
+      // 计算变更类型
+      mergeChanges.value = computeMergeChanges(left.data, right.data, result.result)
+
       return result
     } catch (e) {
       error.value = `合并失败: ${e.message}`
       return null
+    }
+  }
+
+  /**
+   * 计算合并变更类型
+   * @param {*} left - 左侧原始对象
+   * @param {*} right - 右侧原始对象
+   * @param {*} result - 合并结果
+   * @returns {Array} 变更类型数组
+   */
+  function computeMergeChanges(left, right, result) {
+    if (!left || !right || !result) return []
+
+    const changes = []
+
+    // 简化逻辑：直接比较左右两侧
+    collectChanges(left, right, result, '', changes)
+
+    return changes
+  }
+
+  /**
+   * 递归收集变更
+   */
+  function collectChanges(left, right, result, path, changes) {
+    const leftObj = left || {}
+    const rightObj = right || {}
+    const resultObj = result || {}
+
+    const allKeys = new Set([
+      ...Object.keys(leftObj),
+      ...Object.keys(rightObj),
+      ...Object.keys(resultObj)
+    ])
+
+    for (const key of allKeys) {
+      const newPath = path ? `${path}.${key}` : key
+      const leftVal = leftObj[key]
+      const rightVal = rightObj[key]
+      const resultVal = resultObj[key]
+
+      // 比较逻辑
+      if (rightVal !== undefined && leftVal === undefined) {
+        // 右侧新增
+        changes.push({ path: newPath, type: 'added' })
+      } else if (rightVal !== undefined && leftVal !== undefined) {
+        if (JSON.stringify(leftVal) !== JSON.stringify(rightVal)) {
+          // 值发生变化 -> 覆盖
+          changes.push({ path: newPath, type: 'modified' })
+        } else {
+          // 值相同 -> 未变
+          changes.push({ path: newPath, type: 'unchanged' })
+        }
+      }
+
+      // 递归处理对象
+      if (typeof leftVal === 'object' && leftVal !== null &&
+          typeof rightVal === 'object' && rightVal !== null &&
+          !Array.isArray(leftVal) && !Array.isArray(rightVal)) {
+        collectChanges(leftVal, rightVal, resultVal, newPath, changes)
+      }
+    }
+  }
+      }
     }
   }
   
@@ -216,6 +285,7 @@ export function useJsonMerge() {
     rightJson.value = ''
     baseJson.value = ''
     mergeResult.value = null
+    mergeChanges.value = null
     conflicts.value = []
     threeWayStatus.value = null
     error.value = null
@@ -261,6 +331,7 @@ export function useJsonMerge() {
     mergeStrategy,
     arrayStrategy,
     mergeResult,
+    mergeChanges,
     conflicts,
     threeWayStatus,
     error,
