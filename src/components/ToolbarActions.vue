@@ -131,6 +131,14 @@
             <span class="dropdown-item-icon">⚖️</span>
             比较视图
           </button>
+          <button class="dropdown-item" @click="handleDropdownAction('open-merge')">
+            <span class="dropdown-item-icon">🔀</span>
+            智能合并
+          </button>
+          <button class="dropdown-item" @click="handleDropdownAction('open-three-way-merge')">
+            <span class="dropdown-item-icon">🔃</span>
+            三方合并
+          </button>
           <button class="dropdown-item" @click="handleDropdownAction('remove-comments')" :disabled="!hasContent">
             <span class="dropdown-item-icon">🗑️</span>
             移除注释
@@ -208,7 +216,9 @@ const emit = defineEmits([
   'save-to-local',
   'import-excel',
   'export-excel',
-  'open-compare'
+  'open-compare',
+  'open-merge',
+  'open-three-way-merge'
 ])
 
 const showDropdown = ref(false)

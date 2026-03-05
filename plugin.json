@@ -44,6 +44,18 @@
       "cmds": ["JSON比较", "compare json", "JSON对比", "json diff"]
     },
     {
+      "code": "json_merge",
+      "explain": "智能合并两个JSON对象，支持多种合并策略",
+      "icon": "logo.png",
+      "cmds": ["JSON合并", "merge json", "json merge", "智能合并"]
+    },
+    {
+      "code": "json_three_way_merge",
+      "explain": "三方合并：基础版本、左侧版本、右侧版本",
+      "icon": "logo.png",
+      "cmds": ["三方合并", "three way merge", "3方合并"]
+    },
+    {
       "code": "json_convert",
       "explain": "将JSON转换为各种编程语言的类型定义",
       "icon": "logo.png",

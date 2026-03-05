@@ -43,6 +43,9 @@
     </div>
 
     <div class="toolbar-group">
+      <button @click="$emit('merge')" class="btn btn-sm btn-merge" title="合并左右两边 JSON (Ctrl+M)">
+        🔀 合并
+      </button>
       <button @click="$emit('close')" class="btn btn-sm btn-secondary" title="关闭比较模式">
         关闭比较
       </button>
@@ -62,7 +65,7 @@ defineProps({
   }
 })
 
-defineEmits(['format', 'sort', 'swap', 'compare-immediate', 'prev', 'next', 'close'])
+defineEmits(['format', 'sort', 'swap', 'compare-immediate', 'prev', 'next', 'merge', 'close'])
 </script>
 
 <style scoped>

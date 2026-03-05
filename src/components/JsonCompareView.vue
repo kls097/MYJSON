@@ -8,6 +8,7 @@
       @swap="handleSwap"
       @next="handleNext"
       @prev="handlePrev"
+      @merge="handleMerge"
       @compare-immediate="handleCompareImmediate"
       @close="$emit('close')"
     />
@@ -76,7 +77,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'merge'])
 
 // 编辑器组件引用
 const leftEditorRef = ref(null)
@@ -186,10 +187,19 @@ const handleUserEditComplete = () => {
   }, 50)
 }
 
+// 处理合并 - 触发合并事件，传递左右两侧的 JSON
+const handleMerge = () => {
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  emit('merge', { left: rawLeft, right: rawRight })
+}
+
 // 暴露方法给父组件
 defineExpose({
   setInitialData,
-  compareImmediate
+  compareImmediate,
+  leftJson,
+  rightJson
 })
 </script>
 
