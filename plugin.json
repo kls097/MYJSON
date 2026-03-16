@@ -24,14 +24,14 @@
     },
     {
       "code": "json_file",
-      "explain": "打开并编辑JSON文件",
+      "explain": "打开文件并作为JSON处理",
       "icon": "logo.png",
       "cmds": [
         {
           "type": "files",
-          "label": "打开JSON文件",
+          "label": "用JSON工具打开",
           "fileType": "file",
-          "match": "*.json",
+          "match": "*",
           "minLength": 1,
           "maxLength": 1
         }
