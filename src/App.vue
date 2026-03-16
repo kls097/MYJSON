@@ -272,6 +272,37 @@ onMounted(() => {
         return
       }
 
+      // JSON 文件打开入口
+      if (code === 'json_file') {
+        if (type === 'files' && payload && payload.length > 0) {
+          const file = payload[0]
+          // 使用 preload.js 提供的文件读取功能
+          if (window.preloadUtils && window.preloadUtils.readFile) {
+            try {
+              const content = window.preloadUtils.readFile(file.path)
+              currentJson.value = content
+              initHistory(content)
+
+              // 自动格式化
+              nextTick(() => {
+                try {
+                  JSON.parse(content)
+                  if (format()) {
+                    pushHistory(currentJson.value)
+                  }
+                } catch (error) {
+                  console.log('File content is not valid JSON, displaying as-is')
+                }
+              })
+            } catch (error) {
+              console.error('Failed to read file:', error)
+              window.utools?.showNotification('无法读取文件: ' + error.message)
+            }
+          }
+        }
+        return
+      }
+
       // 合并模式入口
       if (code === 'json_merge') {
         showMergeMode.value = true

@@ -19,8 +19,23 @@
       "code": "json_editor",
       "explain": "格式化、验证、压缩、查询JSON",
       "icon": "logo.png",
-      "cmds": ["JSON", "json", "JSON编辑器", "JSON工具", "JSON格式化"],
+      "cmds": ["JSON", "json", "JSON编辑器", "JSON��具", "JSON格式化"],
       "mainPush": true
+    },
+    {
+      "code": "json_file",
+      "explain": "打开并编辑JSON文件",
+      "icon": "logo.png",
+      "cmds": [
+        {
+          "type": "files",
+          "label": "打开JSON文件",
+          "fileType": "file",
+          "match": "*.json",
+          "minLength": 1,
+          "maxLength": 1
+        }
+      ]
     },
     {
       "code": "json_format",
