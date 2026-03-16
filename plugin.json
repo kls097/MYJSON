@@ -31,7 +31,6 @@
           "type": "files",
           "label": "用JSON工具打开",
           "fileType": "file",
-          "match": "*",
           "minLength": 1,
           "maxLength": 1
         }
