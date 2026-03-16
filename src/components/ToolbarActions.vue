@@ -8,22 +8,22 @@
           {{ viewModeLabel }} ▾
         </button>
         <div v-if="showViewDropdown" class="dropdown-menu dropdown-menu-left">
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('code')"
           >
             <span class="dropdown-item-icon">📝</span>
             代码视图
           </button>
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('tree')"
           >
             <span class="dropdown-item-icon">🌳</span>
             树形视图
           </button>
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('table')"
             :disabled="!canOpenTable"
           >
@@ -33,6 +33,20 @@
           </button>
         </div>
       </div>
+      <!-- 保存到本地文件按钮 - 仅在通过文件入口打开时显示 -->
+      <button
+        v-if="openedFilePath"
+        class="btn btn-icon has-tooltip btn-save-file"
+        @click="$emit('save-to-file')"
+        :disabled="!hasContent"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        <span class="tooltip">保存到本地</span>
+      </button>
     </div>
 
     <div class="toolbar-section format-section">
@@ -205,6 +219,10 @@ const props = defineProps({
   canOpenTable: {
     type: Boolean,
     default: false
+  },
+  openedFilePath: {
+    type: String,
+    default: ''
   }
 })
 
@@ -215,6 +233,7 @@ const emit = defineEmits([
   'unescape',
   'fix-json',
   'open-search',
+  'save-to-file',
   'save',
   'toggle-history',
   'toggle-query',
@@ -456,6 +475,19 @@ onUnmounted(() => {
 /* 视图下拉菜单 */
 .view-section .dropdown-menu {
   min-width: 160px;
+}
+
+/* 保存文件按钮 */
+.btn-save-file {
+  background: var(--success-bg, #d4edda);
+  border-color: var(--success, #28a745);
+  color: var(--success, #28a745);
+}
+
+.btn-save-file:hover:not(:disabled) {
+  background: var(--success, #28a745);
+  border-color: var(--success, #28a745);
+  color: #fff;
 }
 
 .dropdown-menu-left {

@@ -44,12 +44,14 @@
         :can-redo="false"
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
+        :opened-file-path="openedFilePath"
         @format="handleFormat"
         @compress="handleCompress"
         @remove-comments="handleRemoveComments"
         @unescape="handleUnescape"
         @fix-json="handleFixJson"
         @open-search="handleOpenSearch"
+        @save-to-file="handleSaveToFile"
         @save="handleSave"
         @toggle-history="showHistory = !showHistory"
         @toggle-query="showQueryPanel = !showQueryPanel"
@@ -196,6 +198,7 @@ const showTableMode = ref(false)
 const tableData = ref([])
 const compareViewRef = ref(null)
 const editorRef = ref(null)  // JsonEditor 组件引用
+const openedFilePath = ref('')  // 通过文件入口打开的文件路径
 
 // 检测是否需要修复
 const needsFixJson = computed(() => {
@@ -276,6 +279,8 @@ onMounted(() => {
       if (code === 'json_file') {
         if (type === 'files' && payload && payload.length > 0) {
           const file = payload[0]
+          // 记录文件路径
+          openedFilePath.value = file.path
           // 使用 preload.js 提供的文件读取功能
           if (window.preloadUtils && window.preloadUtils.readFile) {
             try {
@@ -494,6 +499,24 @@ const handleUnescape = () => {
 const handleOpenSearch = () => {
   if (viewMode.value === 'code' && editorRef.value) {
     editorRef.value.openSearch()
+  }
+}
+
+// 保存到已打开的本地文件
+const handleSaveToFile = () => {
+  if (!openedFilePath.value || !currentJson.value) return
+  if (window.preloadUtils && window.preloadUtils.writeFile) {
+    try {
+      const success = window.preloadUtils.writeFile(openedFilePath.value, currentJson.value)
+      if (success) {
+        window.utools?.showNotification('已保存到: ' + openedFilePath.value)
+      } else {
+        window.utools?.showNotification('保存失败')
+      }
+    } catch (error) {
+      console.error('Failed to save file:', error)
+      window.utools?.showNotification('保存失败: ' + error.message)
+    }
   }
 }
 

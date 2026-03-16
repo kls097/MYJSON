@@ -110,7 +110,7 @@ window.preloadUtils = {
 
   /**
    * 写入文件内容
-   * @param {string} filePath - 文件路径（相对于插件目录）
+   * @param {string} filePath - 文件路径（可以是绝对路径或相对于插件目录的相对路径��
    * @param {string|Buffer} content - 文件内容
    * @returns {boolean} 是否成功
    */
@@ -120,8 +120,13 @@ window.preloadUtils = {
     }
 
     try {
-      // 转换为绝对路径
-      const absolutePath = path.resolve(getPluginDir(), filePath)
+      // 判断是否是绝对路径
+      let absolutePath
+      if (path.isAbsolute(filePath)) {
+        absolutePath = filePath
+      } else {
+        absolutePath = path.resolve(getPluginDir(), filePath)
+      }
       const dir = path.dirname(absolutePath)
 
       // 确保目录存在
