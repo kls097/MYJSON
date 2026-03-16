@@ -44,7 +44,7 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { json } from '@codemirror/lang-json'
 import { lintGutter, linter } from '@codemirror/lint'
-import { search, searchKeymap, SearchQuery, getSearchQuery, setSearchQuery, findNext, findPrevious, closeSearchPanel, SearchCursor } from '@codemirror/search'
+import { search, searchKeymap, SearchQuery, getSearchQuery, setSearchQuery, findNext, findPrevious, closeSearchPanel, openSearchPanel, SearchCursor } from '@codemirror/search'
 import { keymap } from '@codemirror/view'
 import { useClipboard } from '../composables/useClipboard'
 
@@ -147,7 +147,7 @@ function createSearchPanel(view) {
 
   function updateCount() {
     const query = getSearchQuery(view.state)
-    if (!query.valid) {
+    if (!query || !query.valid) {
       countDisplay.textContent = ''
       return
     }
@@ -214,11 +214,12 @@ function createSearchPanel(view) {
   })
 
   // 初始化：从当前搜索状态恢复
-  const currentQuery = getSearchQuery(view.state).spec
-  if (currentQuery.search) {
-    searchField.value = currentQuery.search
-    caseSensitive = currentQuery.caseSensitive || false
-    regexp = currentQuery.regexp || false
+  const currentQuery = getSearchQuery(view.state)
+  const querySpec = currentQuery?.spec || {}
+  if (querySpec.search) {
+    searchField.value = querySpec.search
+    caseSensitive = querySpec.caseSensitive || false
+    regexp = querySpec.regexp || false
     caseBtn.classList.toggle('active', caseSensitive)
     reBtn.classList.toggle('active', regexp)
   }
@@ -239,7 +240,8 @@ function createSearchPanel(view) {
       for (const tr of update.transactions) {
         for (const effect of tr.effects) {
           if (effect.is(setSearchQuery)) {
-            const q = getSearchQuery(view.state).spec
+            const query = getSearchQuery(view.state)
+            const q = query?.spec || {}
             if (q.search !== searchField.value) {
               searchField.value = q.search || ''
             }
@@ -556,6 +558,7 @@ onMounted(() => {
       lintGutter(),
       jsonLinter,
       search({ top: true, createPanel: createSearchPanel }),
+      keymap.of(searchKeymap),  // 添加搜索快捷键支持 (Cmd+F on macOS, Ctrl+F on Windows)
       EditorView.updateListener.of(update => {
         if (update.docChanged) {
           const content = update.state.doc.toString()
@@ -640,6 +643,15 @@ const validateJson = (content) => {
     emit('validate', { valid: false, error: error.message })
   }
 }
+
+// 暴露方法给父组件
+defineExpose({
+  openSearch: () => {
+    if (editorView) {
+      openSearchPanel(editorView)
+    }
+  }
+})
 </script>
 
 <style scoped>

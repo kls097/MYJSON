@@ -13,7 +13,8 @@
 import { ref, onMounted, watch } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState, StateEffect, StateField } from '@codemirror/state'
-import { Decoration } from '@codemirror/view'
+import { Decoration, keymap } from '@codemirror/view'
+import { search, searchKeymap } from '@codemirror/search'
 
 const props = defineProps({
   modelValue: String,
@@ -255,6 +256,8 @@ onMounted(() => {
       doc: initialContent,
       extensions: [
         basicSetup,
+        search({ top: true }),  // 添加搜索功能
+        keymap.of(searchKeymap),  // 添加搜索快捷键支持 (Cmd+F on macOS, Ctrl+F on Windows)
         EditorView.editable.of(true), // 可编辑模式
         EditorView.lineWrapping, // 自动换行
         decorationField, // 使用 StateField 管理装饰器
@@ -273,6 +276,29 @@ onMounted(() => {
               isUserEditing = false
               emit('userEditComplete')
             }, 100)
+          }
+        }),
+        // 粘贴时自动格式化
+        EditorView.domEventHandlers({
+          paste: (event, view) => {
+            const text = event.clipboardData?.getData('text/plain')
+            if (!text) return false
+
+            try {
+              const parsed = JSON.parse(text)
+              const formatted = JSON.stringify(parsed, null, 2)
+              if (formatted !== text) {
+                event.preventDefault()
+                const { from, to } = view.state.selection.main
+                view.dispatch({
+                  changes: { from, to, insert: formatted }
+                })
+                return true
+              }
+            } catch {
+              // 不是有效 JSON
+            }
+            return false
           }
         })
       ],
@@ -393,6 +419,13 @@ watch(() => props.currentDiffIndex, (newIndex) => {
 
 // 暴露方法给父组件，允许直接读取编辑器的原始内容
 defineExpose({
+  setContent: (content) => {
+    if (editorView) {
+      editorView.dispatch({
+        changes: { from: 0, to: editorView.state.doc.length, insert: content }
+      })
+    }
+  },
   getRawContent: () => editorView ? editorView.state.doc.toString() : ''
 })
 </script>

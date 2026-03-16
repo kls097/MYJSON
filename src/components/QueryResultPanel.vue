@@ -17,6 +17,10 @@
       <div class="result-header">
         <span class="success-icon">✓</span>
         <span class="result-title">查询结果</span>
+        <!-- 复制按钮 -->
+        <button class="copy-button" @click="handleCopy" :title="copyButtonTitle">
+          {{ copyButtonText }}
+        </button>
         <!-- 提取到主输入域按钮 -->
         <button class="extract-button" @click="extractToEditor" title="提取到主输入域">
           提取到编辑器
@@ -28,7 +32,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
+import { useClipboard } from '../composables/useClipboard'
 
 const props = defineProps({
   result: {
@@ -43,9 +48,31 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'extract'])
 
+const { copyToClipboard } = useClipboard()
+
+// 复制按钮状态
+const copyButtonText = ref('复制')
+const copyButtonTitle = ref('复制查询结果')
+
 // 提取结果到编辑器
 const extractToEditor = () => {
   emit('extract', formattedResult.value)
+}
+
+// 复制结果到剪贴板
+const handleCopy = async () => {
+  const success = await copyToClipboard(formattedResult.value)
+  if (success) {
+    // 显示复制成功反馈
+    copyButtonText.value = '已复制 ✓'
+    copyButtonTitle.value = '复制成功'
+
+    // 2秒后恢复按钮文本
+    setTimeout(() => {
+      copyButtonText.value = '复制'
+      copyButtonTitle.value = '复制查询结果'
+    }, 2000)
+  }
 }
 
 // 格式化查询结果为 JSON 字符串
@@ -179,6 +206,29 @@ const formattedResult = computed(() => {
   font-size: 14px;
   font-weight: 600;
   flex: 1;
+}
+
+.copy-button {
+  padding: 4px 12px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  margin-right: 8px;
+}
+
+.copy-button:hover {
+  background: var(--bg-hover);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.copy-button:active {
+  transform: scale(0.95);
 }
 
 .extract-button {

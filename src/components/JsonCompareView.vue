@@ -8,7 +8,7 @@
       @swap="handleSwap"
       @next="handleNext"
       @prev="handlePrev"
-      @merge="handleMerge"
+      @merge-to-left="handleMergeToLeft" @merge-to-right="handleMergeToRight"
       @compare-immediate="handleCompareImmediate"
       @close="$emit('close')"
     />
@@ -65,6 +65,7 @@ import CompareToolbar from './CompareToolbar.vue'
 import CompareEditor from './CompareEditor.vue'
 import CompareStatusBar from './CompareStatusBar.vue'
 import { useJsonComparison } from '../composables/useJsonComparison'
+import { deepMerge } from '../utils/jsonMerger'
 
 const props = defineProps({
   initialLeft: {
@@ -187,11 +188,54 @@ const handleUserEditComplete = () => {
   }, 50)
 }
 
-// 处理合并 - 触发合并事件，传递左右两侧的 JSON
-const handleMerge = () => {
+// 合并到左侧 - 将右侧内容合并到左侧
+const handleMergeToLeft = () => {
   const rawLeft = leftEditorRef.value?.getRawContent()
   const rawRight = rightEditorRef.value?.getRawContent()
-  emit('merge', { left: rawLeft, right: rawRight })
+  
+  if (!rawLeft || !rawRight) return
+  
+  try {
+    const leftObj = JSON.parse(rawLeft)
+    const rightObj = JSON.parse(rawRight)
+    // 将右侧合并到左侧
+    const merged = deepMerge(leftObj, rightObj, { arrayStrategy: 'append' })
+    const mergedStr = JSON.stringify(merged.result, null, 2)
+    
+    // 更新左侧编辑器
+    leftEditorRef.value?.setContent(mergedStr)
+    leftJson.value = mergedStr
+    
+    // 重新比较
+    setTimeout(() => compareImmediate(), 50)
+  } catch (e) {
+    console.error('合并到左侧失败:', e)
+  }
+}
+
+// 合并到右侧 - 将左侧内容合并到右侧
+const handleMergeToRight = () => {
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  
+  if (!rawLeft || !rawRight) return
+  
+  try {
+    const leftObj = JSON.parse(rawLeft)
+    const rightObj = JSON.parse(rawRight)
+    // 将左侧合并到右侧
+    const merged = deepMerge(rightObj, leftObj, { arrayStrategy: 'append' })
+    const mergedStr = JSON.stringify(merged.result, null, 2)
+    
+    // 更新右侧编辑器
+    rightEditorRef.value?.setContent(mergedStr)
+    rightJson.value = mergedStr
+    
+    // 重新比较
+    setTimeout(() => compareImmediate(), 50)
+  } catch (e) {
+    console.error('合并到右侧失败:', e)
+  }
 }
 
 // 暴露方法给父组件

@@ -49,6 +49,7 @@
         @remove-comments="handleRemoveComments"
         @unescape="handleUnescape"
         @fix-json="handleFixJson"
+        @open-search="handleOpenSearch"
         @save="handleSave"
         @toggle-history="showHistory = !showHistory"
         @toggle-query="showQueryPanel = !showQueryPanel"
@@ -81,6 +82,7 @@
           />
           <JsonEditor
             v-if="viewMode === 'code'"
+            ref="editorRef"
             v-model="currentJson"
             @validate="handleValidation"
             @extract-to-editor="handleEditorExtract"
@@ -193,6 +195,7 @@ const showThreeWayMergeMode = ref(false)
 const showTableMode = ref(false)
 const tableData = ref([])
 const compareViewRef = ref(null)
+const editorRef = ref(null)  // JsonEditor 组件引用
 
 // 检测是否需要修复
 const needsFixJson = computed(() => {
@@ -453,6 +456,13 @@ const handleUnescape = () => {
     // 去转义成功后，尝试自动格式化
     format()
     pushHistory(currentJson.value)
+  }
+}
+
+// 打开搜索面板
+const handleOpenSearch = () => {
+  if (viewMode.value === 'code' && editorRef.value) {
+    editorRef.value.openSearch()
   }
 }
 

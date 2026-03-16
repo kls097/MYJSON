@@ -77,6 +77,14 @@
         </svg>
         <span class="tooltip">去转义</span>
       </button>
+      <!-- 搜索与替换: 放大镜 -->
+      <button class="btn btn-icon has-tooltip" @click="$emit('open-search')" :disabled="!hasContent">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="10" cy="10" r="7"/>
+          <path d="M21 21l-6-6"/>
+        </svg>
+        <span class="tooltip">搜索与替换</span>
+      </button>
       <!-- 修复JSON: 仅当JSON格式错误时显示 -->
       <button 
         v-if="needsFix" 
@@ -98,9 +106,9 @@
       <button class="btn btn-sm btn-secondary" @click="$emit('toggle-convert')" title="显示/隐藏转换面板">
         {{ showConvert ? '隐藏转换' : '转换' }}
       </button>
-      <button 
-        class="btn btn-sm btn-schema" 
-        @click="$emit('toggle-schema')" 
+      <button
+        class="btn btn-sm btn-secondary"
+        @click="$emit('toggle-schema')"
         :class="{ active: showSchema }"
         title="Schema 工作台"
       >
@@ -206,6 +214,7 @@ const emit = defineEmits([
   'remove-comments',
   'unescape',
   'fix-json',
+  'open-search',
   'save',
   'toggle-history',
   'toggle-query',
@@ -459,23 +468,5 @@ onUnmounted(() => {
   font-size: 11px;
   opacity: 0.5;
   flex-shrink: 0;
-}
-
-/* Schema 按钮 */
-.btn-schema {
-  background: #6f42c1;
-  border-color: #6f42c1;
-  color: white;
-}
-
-.btn-schema:hover {
-  background: #5a32a3;
-  border-color: #5a32a3;
-}
-
-.btn-schema.active {
-  background: #5a32a3;
-  border-color: #5a32a3;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 </style>
