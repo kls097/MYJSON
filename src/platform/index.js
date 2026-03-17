@@ -1,6 +1,6 @@
 // Platform detection and unified export
 
-const isTauri = () => !!window.__TAURI_INTERNALS__
+const isTauri = () => !!(window.__TAURI__ || window.__TAURI_INTERNALS__)
 
 let platformModule = null
 

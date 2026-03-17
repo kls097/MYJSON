@@ -274,9 +274,12 @@ onMounted(async () => {
   // Handle Tauri file open events (macOS file association / drag-drop)
   if (isTauri()) {
     const { listen } = await import('@tauri-apps/api/event')
+    const { invoke } = await import('@tauri-apps/api/core')
 
     // Listen for file open events from Rust backend (drag-drop and file association)
-    listen('open-file', async (event) => {
+    // Must register listener BEFORE sending frontend_ready
+    await listen('open-file', async (event) => {
+      console.log('Received open-file event:', event)
       // Handle both string path (old format) and object with content (new format)
       const payload = event.payload
       let content, fileName
@@ -309,6 +312,28 @@ onMounted(async () => {
         validate()
       }
     })
+
+    // Notify backend that frontend is ready and get pending files
+    try {
+      const pendingFiles = await invoke('frontend_ready')
+      console.log('Frontend ready, pending files:', pendingFiles)
+      
+      // Process any pending files that arrived before frontend was ready
+      for (const payload of pendingFiles) {
+        if (payload && payload.content) {
+          const content = payload.content
+          const fileName = payload.name
+          console.log('Opening pending file:', fileName)
+          pushHistory(currentJson.value)
+          currentJson.value = content
+          format()
+          pushHistory(currentJson.value)
+          validate()
+        }
+      }
+    } catch (err) {
+      console.error('Failed to send frontend ready signal:', err)
+    }
   }
 })
 

@@ -1,7 +1,7 @@
-use tauri::{Emitter, Manager};
 use std::fs;
 use std::io::Write;
 use std::sync::{Arc, Mutex};
+use tauri::{Emitter, Manager, State};
 
 fn log_to_file(msg: &str) {
     let log_dir = dirs::home_dir()
@@ -17,7 +17,12 @@ fn log_to_file(msg: &str) {
         .append(true)
         .open(&log_file)
     {
-        let _ = writeln!(f, "[{}] {}", chrono::Local::now().format("%Y-%m-%d %H:%M:%S"), msg);
+        let _ = writeln!(
+            f,
+            "[{}] {}",
+            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            msg
+        );
     }
 }
 
@@ -27,7 +32,10 @@ fn emit_file_to_window(window: &tauri::WebviewWindow, path_str: &str) -> bool {
     }
     match fs::read_to_string(path_str) {
         Ok(content) => {
-            log_to_file(&format!("File read successfully, size: {} bytes", content.len()));
+            log_to_file(&format!(
+                "File read successfully, size: {} bytes",
+                content.len()
+            ));
             let file_name = std::path::Path::new(path_str)
                 .file_name()
                 .map(|s| s.to_string_lossy().to_string())
@@ -48,6 +56,51 @@ fn emit_file_to_window(window: &tauri::WebviewWindow, path_str: &str) -> bool {
     }
 }
 
+#[tauri::command]
+fn frontend_ready(
+    app: tauri::AppHandle,
+    pending_files: State<Arc<Mutex<Vec<String>>>>,
+) -> Vec<serde_json::Value> {
+    log_to_file("Frontend ready signal received");
+    let pending = pending_files.lock().unwrap().clone();
+
+    let mut results = Vec::new();
+
+    if !pending.is_empty() {
+        log_to_file(&format!(
+            "Sending {} pending files to frontend",
+            pending.len()
+        ));
+        if let Some(window) = app.get_webview_window("main") {
+            for path_str in &pending {
+                log_to_file(&format!("Sending pending file: {}", path_str));
+
+                if let Ok(content) = fs::read_to_string(path_str) {
+                    let file_name = std::path::Path::new(path_str)
+                        .file_name()
+                        .map(|s| s.to_string_lossy().to_string())
+                        .unwrap_or_else(|| "unknown".to_string());
+
+                    let payload = serde_json::json!({
+                        "path": path_str,
+                        "name": file_name,
+                        "content": content
+                    });
+                    results.push(payload);
+                    log_to_file(&format!("File added to response: {}", file_name));
+                } else {
+                    log_to_file(&format!("Failed to read file: {}", path_str));
+                }
+            }
+            pending_files.lock().unwrap().clear();
+        }
+    } else {
+        log_to_file("No pending files to send");
+    }
+
+    results
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     log_to_file("Application starting...");
@@ -58,6 +111,8 @@ pub fn run() {
     let pending_for_run = pending_files.clone();
 
     tauri::Builder::default()
+        .manage(pending_files.clone())
+        .invoke_handler(tauri::generate_handler![frontend_ready])
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_clipboard_manager::init())
@@ -95,7 +150,10 @@ pub fn run() {
                         if let Some(query) = url.query() {
                             if query.starts_with("path=") {
                                 let file_path = &query[5..];
-                                log_to_file(&format!("Extracted file path from deep link: {}", file_path));
+                                log_to_file(&format!(
+                                    "Extracted file path from deep link: {}",
+                                    file_path
+                                ));
 
                                 if let Some(window) = handle.get_webview_window("main") {
                                     emit_file_to_window(&window, file_path);
@@ -123,38 +181,14 @@ pub fn run() {
                 log_to_file("No command line args found");
             }
 
-            // Process any pending files that arrived via RunEvent::Opened before setup
-            let pending = pending_for_setup.lock().unwrap().clone();
+            // Don't process pending files here - wait for frontend_ready signal
+            let pending = pending_for_setup.lock().unwrap();
             if !pending.is_empty() {
-                log_to_file(&format!("Processing {} pending files from early RunEvent::Opened", pending.len()));
-                if let Some(window) = app.get_webview_window("main") {
-                    for path_str in &pending {
-                        log_to_file(&format!("Emitting pending file: {}", path_str));
-                        emit_file_to_window(&window, path_str);
-                    }
-                    pending_for_setup.lock().unwrap().clear();
-                } else {
-                    log_to_file("Window still not ready during setup, files remain pending");
-                }
+                log_to_file(&format!(
+                    "Queued {} files, waiting for frontend ready signal",
+                    pending.len()
+                ));
             }
-
-            // Also set up a delayed emit for pending files (window webview might not be fully loaded yet)
-            let handle = app.handle().clone();
-            let pending_for_delayed = pending_for_setup.clone();
-            std::thread::spawn(move || {
-                // Wait for the frontend to be ready
-                std::thread::sleep(std::time::Duration::from_millis(1500));
-                let pending = pending_for_delayed.lock().unwrap().clone();
-                if !pending.is_empty() {
-                    log_to_file(&format!("Delayed: processing {} pending files", pending.len()));
-                    if let Some(window) = handle.get_webview_window("main") {
-                        for path_str in &pending {
-                            emit_file_to_window(&window, path_str);
-                        }
-                        pending_for_delayed.lock().unwrap().clear();
-                    }
-                }
-            });
 
             Ok(())
         })
@@ -170,7 +204,8 @@ pub fn run() {
                             }
                             match fs::read_to_string(&path_str) {
                                 Ok(content) => {
-                                    let file_name = path.file_name()
+                                    let file_name = path
+                                        .file_name()
                                         .map(|s| s.to_string_lossy().to_string())
                                         .unwrap_or_else(|| "unknown".to_string());
                                     let payload = serde_json::json!({
@@ -179,7 +214,10 @@ pub fn run() {
                                         "content": content
                                     });
                                     let _ = window.emit("open-file", payload);
-                                    log_to_file(&format!("Drag-drop event emitted for: {}", file_name));
+                                    log_to_file(&format!(
+                                        "Drag-drop event emitted for: {}",
+                                        file_name
+                                    ));
                                 }
                                 Err(e) => {
                                     log_to_file(&format!("Failed to read drag-drop file: {}", e));
