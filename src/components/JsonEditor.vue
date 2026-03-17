@@ -44,7 +44,7 @@ import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
 import { EditorView, basicSetup } from 'codemirror'
 import { json } from '@codemirror/lang-json'
 import { lintGutter, linter } from '@codemirror/lint'
-import { search, searchKeymap, SearchQuery, getSearchQuery, setSearchQuery, findNext, findPrevious, closeSearchPanel, SearchCursor } from '@codemirror/search'
+import { search, searchKeymap, SearchQuery, getSearchQuery, setSearchQuery, findNext, findPrevious, closeSearchPanel, openSearchPanel, replaceNext, replaceAll } from '@codemirror/search'
 import { keymap } from '@codemirror/view'
 import { useClipboard } from '../composables/useClipboard'
 
@@ -93,6 +93,10 @@ function createSearchPanel(view) {
   const dom = document.createElement('div')
   dom.className = 'cm-search-panel'
 
+  // 搜索行
+  const searchRow = document.createElement('div')
+  searchRow.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
+
   const searchField = document.createElement('input')
   searchField.className = 'cm-search-field'
   searchField.placeholder = '搜索...'
@@ -134,13 +138,41 @@ function createSearchPanel(view) {
   closeBtn.title = '关闭 (Escape)'
   closeBtn.type = 'button'
 
-  dom.appendChild(searchField)
-  dom.appendChild(countDisplay)
-  dom.appendChild(prevBtn)
-  dom.appendChild(nextBtn)
-  dom.appendChild(caseBtn)
-  dom.appendChild(reBtn)
-  dom.appendChild(closeBtn)
+  searchRow.appendChild(searchField)
+  searchRow.appendChild(countDisplay)
+  searchRow.appendChild(prevBtn)
+  searchRow.appendChild(nextBtn)
+  searchRow.appendChild(caseBtn)
+  searchRow.appendChild(reBtn)
+  searchRow.appendChild(closeBtn)
+
+  // 替换行
+  const replaceRow = document.createElement('div')
+  replaceRow.style.cssText = 'display: flex; align-items: center; gap: 8px; flex-wrap: wrap;'
+
+  const replaceField = document.createElement('input')
+  replaceField.className = 'cm-replace-field'
+  replaceField.placeholder = '替换为...'
+  replaceField.type = 'text'
+
+  const replaceBtn = document.createElement('button')
+  replaceBtn.className = 'cm-replace-btn'
+  replaceBtn.textContent = '替换'
+  replaceBtn.title = '替换当前'
+  replaceBtn.type = 'button'
+
+  const replaceAllBtn = document.createElement('button')
+  replaceAllBtn.className = 'cm-replace-btn'
+  replaceAllBtn.textContent = '全部替换'
+  replaceAllBtn.title = '全部替换'
+  replaceAllBtn.type = 'button'
+
+  replaceRow.appendChild(replaceField)
+  replaceRow.appendChild(replaceBtn)
+  replaceRow.appendChild(replaceAllBtn)
+
+  dom.appendChild(searchRow)
+  dom.appendChild(replaceRow)
 
   let caseSensitive = false
   let regexp = false
@@ -211,6 +243,27 @@ function createSearchPanel(view) {
   closeBtn.addEventListener('click', () => {
     closeSearchPanel(view)
     view.focus()
+  })
+
+  // 替换功能
+  replaceBtn.addEventListener('click', () => {
+    if (!searchField.value) return
+    replaceNext(view, replaceField.value)
+    updateCount()
+  })
+
+  replaceAllBtn.addEventListener('click', () => {
+    if (!searchField.value) return
+    replaceAll(view, replaceField.value)
+    updateCount()
+  })
+
+  replaceField.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      replaceNext(view, replaceField.value)
+      updateCount()
+    }
   })
 
   // 初始化：从当前搜索状态恢复
@@ -556,6 +609,7 @@ onMounted(() => {
       lintGutter(),
       jsonLinter,
       search({ top: true, createPanel: createSearchPanel }),
+      keymap.of(searchKeymap),
       EditorView.updateListener.of(update => {
         if (update.docChanged) {
           const content = update.state.doc.toString()
@@ -640,6 +694,15 @@ const validateJson = (content) => {
     emit('validate', { valid: false, error: error.message })
   }
 }
+
+// 暴露方法给父组件
+defineExpose({
+  openSearch: () => {
+    if (editorView) {
+      openSearchPanel(editorView)
+    }
+  }
+})
 </script>
 
 <style scoped>
