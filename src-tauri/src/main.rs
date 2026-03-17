@@ -1,3 +1,3 @@
 fn main() {
-    json_toolbox_lib::run()
+    my_json_lib::run()
 }
