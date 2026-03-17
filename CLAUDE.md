@@ -4,51 +4,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-这是一个 uTools 平台的 JSON 处理插件，功能包括格式化、压缩、验证、查询、比较和 Excel 转换。使用 Vue 3 + Vite 构建，运行在 uTools 桌面应用框架内。
+这是一个 macOS 桌面 JSON 工具箱应用，功能包括格式化、压缩、验证、查询、比较和 Excel 转换。使用 Vue 3 + Vite + Tauri v2 构建，作为原生 macOS 应用运行。
 
 ## 开发命令
 
-### 开发模式
+### 纯前端开发模式
 ```bash
 npm run dev
 ```
-启动 Vite 开发服务器，地址为 `http://localhost:5173`。在 uTools 开发者工具中添加本项目目录，插件将从开发服务器加载（配置在 `plugin.json` 的 development.main）。
+启动 Vite 开发服务器，地址为 `http://localhost:5173`。可在浏览器中直接使用（文件对话框等功能会回退到浏览器 API）。
 
-### 构建
+### Tauri 开发模式
 ```bash
-npm run build
+npm run tauri:dev
 ```
-构建生产版本到 `dist/` 目录。此命令会：
-1. 运行 Vite 构建，进行代码分割（vendor、json-tools、excel、quicktype 等 chunks）
-2. 执行 `scripts/copy-files.js` 将 `plugin.json`、`preload.js`、`logo.png` 和字体文件复制到 `dist/`
+启动 Tauri 开发模式，同时运行 Vite 开发服务器和 Tauri 原生窗口。支持热重载。
 
-### 打包
+### 构建前端
 ```bash
-npm run pack
+npm run build:web
 ```
-从 `dist/` 目录创建 `myjson-plugin.upx` 文件（ZIP 压缩包），用于 uTools 安装。
+构建前端生产版本到 `dist/` 目录。
+
+### 构建 macOS 应用
+```bash
+npm run tauri:build
+```
+构建完整的 macOS 应用，产出 `.app` 和 `.dmg` 文件到 `src-tauri/target/release/bundle/`。
 
 ## 架构设计
 
-### uTools 插件结构
+### Tauri v2 + Vue 3 架构
 
-这是一个 **uTools 插件**，不是标准的 Web 应用。关键区别：
+这是一个 **Tauri v2 macOS 桌面应用**，使用系统 WebKit 渲染前端。
 
-- **plugin.json**：定义插件元数据、功能特性和入口点（cmds）。每个 feature 有一个 `code` 决定应用进入哪个模式。
-- **preload.js**：Node.js 上下文脚本，通过 `window.preloadUtils` 向渲染进程暴露原生 API（文件 I/O 操作）。根据 uTools 规范必须保持未压缩状态。
-- **index.html**：uTools 加载的主入口点，可以从开发服务器或构建文件加载。
+- **src-tauri/**：Rust 后端，管理窗口、插件注册、文件关联
+- **src-tauri/tauri.conf.json**：应用配置（窗口大小、文件关联、打包选项）
+- **src-tauri/capabilities/default.json**：权限配置（文件系统、剪贴板、对话框）
+- **src/platform/**：平台抽象层，统一封装文件对话框、I/O、剪贴板、数据库操作
+- **index.html**：Tauri WebView 加载的主入口
 
-### 应用入口点
+### 应用入口
 
-应用基于 `plugin.json` 的 features 有多个入口模式：
+应用启动后默认进入 JSON 编辑器模式。其他模式（比较、合并、表格等）通过工具栏按钮进入。
 
-- `json_editor`：主编辑器（关键词："JSON"、"json"、"JSON编辑器"）
-- `json_format`：自动格式化选中的 JSON 文本（正则匹配）
-- `json_compare`：JSON 比较视图
-- `json_convert`：将 JSON 转换为代码（TypeScript、Go、Java 等）
-- `json_table`：JSON 数组的表格视图
+支持的功能模式：
+- 编辑器模式（默认）：格式化、压缩、验证、查询
+- 比较模式：JSON diff 对比
+- 合并模式：智能合并 / 三方合并
+- 转换模式：JSON 转代码（TypeScript、Go、Java 等）
+- 表格模式：JSON 数组的表格视图
 
-入口处理在 `App.vue:onMounted` 中通过 `window.utools.onPluginEnter()` 实现。
+文件打开方式：
+- Finder 中双击 .json 文件（通过 macOS 文件关联）
+- 拖拽 .json 文件到应用窗口
+- 工具栏导入按钮
 
 ### Vue 3 Composition API 架构
 
@@ -56,12 +66,17 @@ npm run pack
 
 **Composables**（可复用逻辑）：
 - `useJsonOperations`：核心 JSON 操作（格式化、压缩、验证、反转义、移除注释）
-- `useJsonStorage`：从 uTools 数据库保存/加载（`window.utools.db`）
-- `useClipboard`：通过 uTools API 进行剪贴板操作
+- `useJsonStorage`：通过平台抽象层保存/加载文档
+- `useClipboard`：通过平台抽象层进行剪贴板操作
 - `useHistory`：撤销/重做，历史栈（最多 50 条记录）
 - `useJsonPath`：JSONPath 和 JMESPath 查询执行
 - `useJsonComparison`：JSON 差异比较
 - `useJsonConverter`：将 JSON 转换为编程语言类型（使用 quicktype-core）
+
+**Platform**（平台抽象层 `src/platform/`）：
+- `index.js`：平台检测 + 统一导出
+- `tauri.js`：Tauri v2 实现（对话框、文件 I/O、剪贴板）
+- `browser.js`：浏览器回退实现（开发模式用）
 
 **Utils**（纯函数）：
 - `jsonFormatter.js`：格式化/压缩 JSON
@@ -94,26 +109,19 @@ npm run pack
 
 ### 文件 I/O 模式
 
-插件同时支持 uTools 环境和浏览器回退：
+通过平台抽象层（`src/platform/`）统一封装，前端代码无需关心底层平台：
 
 ```javascript
-// uTools 环境（首选）
-if (window.utools && window.utools.showSaveDialog) {
-  const filePath = window.utools.showSaveDialog({...})
-  window.preloadUtils.writeFile(filePath, content)
-}
-// 浏览器回退
-else {
-  const blob = new Blob([content])
-  // ... 通过 <a> 元素下载
-}
+import { showSaveDialog, showOpenDialog, copyToClipboard } from './platform/index.js'
+
+// 自动检测 Tauri 或浏览器环境
+await showSaveDialog({ defaultPath: 'data.json', content: jsonStr })
+const result = await showOpenDialog({ filters: [{ name: 'JSON', extensions: ['json'] }] })
+await copyToClipboard(text)
 ```
 
-此模式用于：
-- `handleSaveToLocal()`：保存 JSON 到本地文件
-- `handleImportJson()`：导入 JSON/TXT 文件
-- `handleImportExcel()` / `handleExportExcel()`：Excel 转换
-- `handleDownloadTableExcel()`：从表格视图导出
+Tauri 模式使用：`@tauri-apps/plugin-dialog`、`@tauri-apps/plugin-fs`、`@tauri-apps/plugin-clipboard-manager`
+浏览器模式使用：Blob 下载、`<input type="file">`、`navigator.clipboard`
 
 ### 历史记录管理
 
@@ -139,9 +147,12 @@ else {
 ## 关键技术细节
 
 ### Vite 配置
-- `base: './'` 对于 uTools 本地文件加载至关重要
+- `base: './'` 对于 Tauri 本地文件加载至关重要
+- `clearScreen: false` 避免清除 Tauri 输出
+- `strictPort: true` 确保端口固定（Tauri 需要）
 - 手动分块拆分 vendor 代码以提高性能
-- 开发服务器在端口 5173，host 为 `0.0.0.0`
+- 开发服务器在端口 5173，支持 `TAURI_DEV_HOST`
+- `watch.ignored: ['**/src-tauri/**']` 避免监视 Rust 文件
 
 ### CodeMirror 6 集成
 `JsonEditor.vue` 使用 CodeMirror 6：
@@ -149,13 +160,11 @@ else {
 - `@codemirror/lint` 用于实时验证
 - 自定义 linter 解析 JSON 并报告带行/列的错误
 
-### uTools 数据库
-通过 `window.utools.db` API 访问：
-- `put({ _id, data, _rev })`：保存/更新文档
-- `get(id)`：检索文档
-- `allDocs()`：列出所有文档
-- `remove(doc)`：删除文档
-- 通过 `window.utools.onDbPull` 支持云同步
+### uTools 数据库 → localStorage
+
+数据存储使用 localStorage（数据量小，足够使用）：
+- 通过 `src/platform/index.js` 的 `dbPut/dbGet/dbGetAll/dbRemove` 封装
+- 前端���码无需直接操作 localStorage
 
 ### 查询引擎
 支持两种查询语法：
@@ -178,27 +187,29 @@ else {
 4. 在 `ToolbarActions.vue` 中添加按钮并发出事件
 5. 在 `App.vue` 模板中连接事件处理器
 
-### 使用 uTools API
+### 使用平台 API
 
-始终检查 uTools 环境：
+通过平台抽象层调用原生功能：
 ```javascript
-if (window.utools && window.utools.someAPI) {
-  // uTools 特定代码
-} else {
-  // 浏览器回退
-}
-```
+import { showSaveDialog, showOpenDialog, copyToClipboard, dbPut, dbGet, dbGetAll, dbRemove } from '../platform/index.js'
 
-常用 API：
-- `window.utools.onPluginEnter(callback)`：入口点处理器
-- `window.utools.showSaveDialog(options)`：原生保存对话框
-- `window.utools.showOpenDialog(options)`：原生打开对话框
-- `window.utools.db.*`：数据库操作
-- `window.preloadUtils.*`：来自 preload.js 的文件 I/O
+// 文件对话框
+const result = await showOpenDialog({ filters: [...], binary: false })
+await showSaveDialog({ defaultPath: 'file.json', content: text })
+
+// 剪贴板
+await copyToClipboard(text)
+
+// 数据存储
+dbPut('key', data)
+const data = dbGet('key')
+const all = dbGetAll('prefix_')
+dbRemove('key')
+```
 
 ## 构建输出结构
 
-执行 `npm run build` 后：
+执行 `npm run build:web` 后：
 ```
 dist/
 ├── index.html
@@ -209,10 +220,12 @@ dist/
 │   ├── json-tools-[hash].js
 │   ├── excel-[hash].js
 │   └── quicktype-[hash].js
-├── fonts/
-├── plugin.json
-├── preload.js
-└── logo.png
+└── fonts/
 ```
 
-`pack` 脚本将其打包为 `myjson-plugin.upx`。
+执行 `npm run tauri:build` 后：
+```
+src-tauri/target/release/bundle/
+├── macos/JSON工具箱.app
+└── dmg/JSON工具箱_4.0.0_aarch64.dmg
+```

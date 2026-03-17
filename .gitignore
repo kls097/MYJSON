@@ -147,3 +147,4 @@ dist
 !/CLAUDE.md
 !/myjson-plugin.upx
 !/docs/
+/src-tauri/target/

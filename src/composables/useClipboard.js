@@ -1,22 +1,9 @@
 // Clipboard operations composable
+import { copyToClipboard as platformCopy } from '../platform/index.js'
 
 export function useClipboard() {
   const copyToClipboard = (text) => {
-    if (window.utools && window.utools.copyText) {
-      window.utools.copyText(text)
-      return true
-    }
-
-    // Fallback for development
-    return navigator.clipboard.writeText(text)
-      .then(() => {
-        console.log('Copied to clipboard!')
-        return true
-      })
-      .catch(err => {
-        console.error('Copy failed:', err)
-        return false
-      })
+    return platformCopy(text)
   }
 
   return { copyToClipboard }

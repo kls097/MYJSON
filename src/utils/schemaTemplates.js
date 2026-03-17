@@ -2,6 +2,7 @@
  * JSON Schema 模板库
  * 提供常用的 JSON Schema 模板
  */
+import { dbPut, dbGetAll, dbRemove } from '../platform/index.js'
 
 /**
  * 内置模板列表
@@ -826,16 +827,8 @@ export function saveCustomTemplate(name, schema, meta = {}) {
       icon: meta.icon || '📝',
       createdAt: Date.now()
     }
-    
-    if (window.utools) {
-      window.utools.db.put({
-        _id: storageKey,
-        data
-      })
-    } else {
-      localStorage.setItem(storageKey, JSON.stringify(data))
-    }
-    
+
+    dbPut(storageKey, data)
     return true
   } catch (error) {
     console.error('保存自定义模板失败:', error)
@@ -849,35 +842,13 @@ export function saveCustomTemplate(name, schema, meta = {}) {
  */
 export function getCustomTemplates() {
   try {
-    const templates = []
-    
-    if (window.utools) {
-      const docs = window.utools.db.allDocs()
-      docs.forEach(doc => {
-        if (doc._id.startsWith('custom_schema_template_')) {
-          templates.push({
-            id: doc._id.replace('custom_schema_template_', ''),
-            ...doc.data,
-            isCustom: true,
-            schemaString: JSON.stringify(doc.data.schema, null, 2)
-          })
-        }
-      })
-    } else {
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('custom_schema_template_')) {
-          const data = JSON.parse(localStorage.getItem(key))
-          templates.push({
-            id: key.replace('custom_schema_template_', ''),
-            ...data,
-            isCustom: true,
-            schemaString: JSON.stringify(data.schema, null, 2)
-          })
-        }
-      }
-    }
-    
+    const docs = dbGetAll('custom_schema_template_')
+    const templates = docs.map(doc => ({
+      id: doc._id.replace('custom_schema_template_', ''),
+      ...doc,
+      isCustom: true,
+      schemaString: JSON.stringify(doc.schema, null, 2)
+    }))
     return templates.sort((a, b) => b.createdAt - a.createdAt)
   } catch (error) {
     console.error('获取自定义模板失败:', error)
@@ -892,16 +863,7 @@ export function getCustomTemplates() {
 export function deleteCustomTemplate(name) {
   try {
     const storageKey = `custom_schema_template_${name}`
-    
-    if (window.utools) {
-      const doc = window.utools.db.get(storageKey)
-      if (doc) {
-        window.utools.db.remove(doc._id)
-      }
-    } else {
-      localStorage.removeItem(storageKey)
-    }
-    
+    dbRemove(storageKey)
     return true
   } catch (error) {
     console.error('删除自定义模板失败:', error)

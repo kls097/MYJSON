@@ -3,6 +3,7 @@
  * 使用 json-schema-faker 和 faker 生成符合 Schema 的测试数据
  */
 import jsf from 'json-schema-faker'
+import { dbPut, dbGet, dbGetAll, dbRemove } from '../platform/index.js'
 
 /**
  * Mock 生成选项
@@ -188,15 +189,8 @@ export function saveMockConfig(name, config) {
       config,
       createdAt: Date.now()
     }
-    
-    if (window.utools) {
-      window.utools.db.put({
-        _id: storageKey,
-        data
-      })
-    } else {
-      localStorage.setItem(storageKey, JSON.stringify(data))
-    }
+
+    dbPut(storageKey, data)
   } catch (error) {
     console.error('保存 Mock 配置失败:', error)
   }
@@ -210,14 +204,8 @@ export function saveMockConfig(name, config) {
 export function loadMockConfig(name) {
   try {
     const storageKey = `mock_config_${name}`
-    
-    if (window.utools) {
-      const doc = window.utools.db.get(storageKey)
-      return doc?.data?.config || null
-    } else {
-      const data = localStorage.getItem(storageKey)
-      return data ? JSON.parse(data).config : null
-    }
+    const data = dbGet(storageKey)
+    return data?.config || null
   } catch (error) {
     console.error('加载 Mock 配置失败:', error)
     return null
@@ -230,33 +218,11 @@ export function loadMockConfig(name) {
  */
 export function getAllMockConfigs() {
   try {
-    const configs = []
-    
-    if (window.utools) {
-      // 使用 uTools 数据库
-      const docs = window.utools.db.allDocs()
-      docs.forEach(doc => {
-        if (doc._id.startsWith('mock_config_')) {
-          configs.push({
-            name: doc.data.name,
-            createdAt: doc.data.createdAt
-          })
-        }
-      })
-    } else {
-      // 使用 localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('mock_config_')) {
-          const data = JSON.parse(localStorage.getItem(key))
-          configs.push({
-            name: data.name,
-            createdAt: data.createdAt
-          })
-        }
-      }
-    }
-    
+    const docs = dbGetAll('mock_config_')
+    const configs = docs.map(doc => ({
+      name: doc.name,
+      createdAt: doc.createdAt
+    }))
     return configs.sort((a, b) => b.createdAt - a.createdAt)
   } catch (error) {
     console.error('获取 Mock 配置失败:', error)
@@ -271,15 +237,7 @@ export function getAllMockConfigs() {
 export function deleteMockConfig(name) {
   try {
     const storageKey = `mock_config_${name}`
-    
-    if (window.utools) {
-      const doc = window.utools.db.get(storageKey)
-      if (doc) {
-        window.utools.db.remove(doc._id)
-      }
-    } else {
-      localStorage.removeItem(storageKey)
-    }
+    dbRemove(storageKey)
   } catch (error) {
     console.error('删除 Mock 配置失败:', error)
   }

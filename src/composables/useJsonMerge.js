@@ -1,5 +1,6 @@
 // JSON 合并逻辑 Composable
 import { ref, computed, nextTick } from 'vue'
+import { copyToClipboard } from '../platform/index.js'
 import {
   deepMerge,
   overrideMerge,
@@ -264,12 +265,8 @@ export function useJsonMerge() {
    */
   async function copyResult() {
     const text = formatResult()
-    
-    if (window.utools && window.utools.writeClipboardText) {
-      window.utools.writeClipboardText(text)
-    } else if (navigator.clipboard) {
-      await navigator.clipboard.writeText(text)
-    }
+
+    await copyToClipboard(text)
     
     return text
   }

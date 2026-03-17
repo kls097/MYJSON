@@ -165,6 +165,7 @@ import { useClipboard } from './composables/useClipboard'
 import { useHistory } from './composables/useHistory'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
+import { showSaveDialog as platformSaveDialog, showOpenDialog as platformOpenDialog, isTauri } from './platform/index.js'
 
 const {
   currentJson,
@@ -249,147 +250,65 @@ const hasConvertResult = computed(() => {
 provide('currentJson', currentJson)
 provide('parsedJson', parsedJson)
 
-// Handle plugin entry from uTools
-onMounted(() => {
+// Handle plugin entry
+onMounted(async () => {
   // 添加全局快捷键监听
   document.addEventListener('keydown', handleKeydown)
 
-  if (window.utools && window.utools.onPluginEnter) {
-    window.utools.onPluginEnter(({ code, type, payload }) => {
-      activeFeature.value = code
-
-      // 比较模式入口
-      if (code === 'json_compare') {
-        showCompareMode.value = true
-        // 如果有 payload,可以设置初始数据
-        if (payload && type === 'regex') {
-          nextTick(() => {
-            if (compareViewRef.value) {
-              compareViewRef.value.setInitialData(payload, '')
-            }
-          })
+  // Initialize with sample JSON in dev/default mode
+  const sampleJson = JSON.stringify({
+    name: "Sample JSON",
+    version: "1.0.0",
+    features: ["format", "compress", "query"],
+    nested: {
+      level1: {
+        level2: {
+          level3: "Deep nesting"
         }
+      }
+    }
+  }, null, 2)
+  currentJson.value = sampleJson
+  initHistory(sampleJson)
+
+  // Handle Tauri file open events (macOS file association / drag-drop)
+  if (isTauri()) {
+    const { listen } = await import('@tauri-apps/api/event')
+
+    // Listen for file open events from Rust backend (drag-drop and file association)
+    listen('open-file', async (event) => {
+      // Handle both string path (old format) and object with content (new format)
+      const payload = event.payload
+      let content, fileName
+
+      if (typeof payload === 'string') {
+        // Old format: just the file path
+        try {
+          const { readTextFile } = await import('@tauri-apps/plugin-fs')
+          content = await readTextFile(payload)
+          fileName = payload.split('/').pop()
+        } catch (err) {
+          console.error('Failed to read file:', err)
+          return
+        }
+      } else if (payload && payload.content) {
+        // New format: object with path, name, and content
+        content = payload.content
+        fileName = payload.name
+      } else {
+        console.error('Invalid file payload:', payload)
         return
       }
 
-      // 合并模式入口
-      if (code === 'json_merge') {
-        showMergeMode.value = true
-        if (payload && type === 'regex') {
-          // TODO: 可以传递给合并面板
-        }
-        return
-      }
-
-      // 三方合并入口
-      if (code === 'json_three_way_merge') {
-        showThreeWayMergeMode.value = true
-        if (payload && type === 'regex') {
-          // TODO: 可以传递给三方合并面板
-        }
-        return
-      }
-
-      // 表格视图入口
-      if (code === 'json_table') {
-        if (payload && type === 'regex') {
-          currentJson.value = payload
-          initHistory(payload)
-          // 自动格式化
-          nextTick(() => {
-            try {
-              JSON.parse(payload)
-              if (format()) {
-                pushHistory(currentJson.value)
-              }
-              // 尝试打开表格视图
-              handleOpenTable()
-            } catch (error) {
-              console.log('Input is not valid JSON')
-            }
-          })
-        } else {
-          // 如果当前有数据，尝试打开表格视图
-          if (currentJson.value) {
-            handleOpenTable()
-          }
-        }
-        return
-      }
-
-      // 转换模式入口
-      if (code === 'json_convert') {
-        showConvertPanel.value = true
-        // 如果有 payload,设置为当前JSON
-        if (payload && type === 'regex') {
-          currentJson.value = payload
-          initHistory(payload)
-          // 自动格式化
-          nextTick(() => {
-            try {
-              JSON.parse(payload)
-              if (format()) {
-                pushHistory(currentJson.value)
-              }
-            } catch (error) {
-              console.log('Input is not valid JSON')
-            }
-          })
-        }
-        return
-      }
-
-      // Handle text detection (regex or over type)
-      if (type === 'regex' || type === 'over') {
-        currentJson.value = payload
-        // 初始化历史记录
-        initHistory(payload)
-
-        // Auto-format JSON if input is valid JSON string
-        // Use nextTick to ensure the editor has updated
-        nextTick(() => {
-          try {
-            // Try to parse and validate the input
-            JSON.parse(payload)
-
-            // If parsing succeeds, format the JSON
-            if (format()) {
-              pushHistory(currentJson.value)
-            }
-          } catch (error) {
-            // If not valid JSON, just display as-is
-            console.log('Input is not valid JSON, displaying as-is')
-          }
-        })
-      }
-
-      // Show history panel for json_history feature
-      if (code === 'json_history') {
-        showHistory.value = true
+      if (content) {
+        console.log('Opened file:', fileName)
+        pushHistory(currentJson.value)
+        currentJson.value = content
+        format()
+        pushHistory(currentJson.value)
+        validate()
       }
     })
-
-    // Listen for cloud sync events
-    window.utools.onDbPull && window.utools.onDbPull(() => {
-      console.log('Data synced from cloud')
-    })
-  } else {
-    // Development mode - load sample JSON
-    const sampleJson = JSON.stringify({
-      name: "Sample JSON",
-      version: "1.0.0",
-      features: ["format", "compress", "query"],
-      nested: {
-        level1: {
-          level2: {
-            level3: "Deep nesting"
-          }
-        }
-      }
-    }, null, 2)
-    currentJson.value = sampleJson
-    // 初始化历史记录
-    initHistory(sampleJson)
   }
 })
 
@@ -690,53 +609,21 @@ const handleTableApply = (newData) => {
 }
 
 // 处理表格视图的 Excel 导出
-const handleDownloadTableExcel = () => {
+const handleDownloadTableExcel = async () => {
   try {
-    // tableData 已经是数组格式，直接使用
     const buffer = jsonToExcel(tableData.value)
 
-    // 生成默认文件名
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
     const defaultName = `json_export_${timestamp}.xlsx`
 
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '导出到 Excel',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'Excel 文件', extensions: ['xlsx'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        const success = window.preloadUtils.writeFile(filePath, buffer)
-
-        if (!success) {
-          alert('导出失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    await platformSaveDialog({
+      title: '导出到 Excel',
+      defaultPath: defaultName,
+      binaryContent: buffer,
+      filters: [
+        { name: 'Excel 文件', extensions: ['xlsx'] }
+      ]
     })
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
   } catch (error) {
     console.error('Excel 导出失败:', error)
     alert(`导出失败: ${error.message}`)
@@ -876,77 +763,26 @@ const handleEditorExtract = (content) => {
 // 处理Excel导入
 const handleImportExcel = async () => {
   try {
-    // 优先使用 uTools 的文件选择对话框
-    if (window.utools && window.utools.showOpenDialog) {
-      const files = window.utools.showOpenDialog({
-        title: '从 Excel 导入',
-        filters: [
-          { name: 'Excel 文件', extensions: ['xlsx', 'xls'] }
-        ],
-        properties: ['openFile']
-      })
+    const result = await platformOpenDialog({
+      title: '从 Excel 导入',
+      filters: [
+        { name: 'Excel 文件', extensions: ['xlsx', 'xls'] }
+      ],
+      binary: true
+    })
 
-      if (!files || files.length === 0) {
-        // 用户取消选择
-        return
-      }
+    if (!result) return
 
-      const filePath = files[0]
+    // 将 Excel 转换为 JSON
+    const jsonArray = excelToJson(result.content)
 
-      // ���用 preload 提供的文件读取功能
-      if (window.preloadUtils && window.preloadUtils.readFile) {
-        const buffer = window.preloadUtils.readFile(filePath, null)
-
-        if (!buffer) {
-          alert('读取文件失败')
-          return
-        }
-
-        // 将 Excel 转换为 JSON
-        const jsonArray = excelToJson(buffer)
-
-        // 记录历史
-        pushHistory(currentJson.value)
-        // 格式化并设置到编辑器
-        const newContent = JSON.stringify(jsonArray, null, 2)
-        currentJson.value = newContent
-        pushHistory(newContent)
-        validate()
-
-        return
-      }
-    }
-
-    // 浏览器环境下使用 HTML5 File API
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.xlsx,.xls'
-
-    input.onchange = async (e) => {
-      const file = e.target.files[0]
-      if (!file) return
-
-      try {
-        // 读取文件为 ArrayBuffer
-        const arrayBuffer = await file.arrayBuffer()
-
-        // 将 Excel 转换为 JSON
-        const jsonArray = excelToJson(arrayBuffer)
-
-        // 记录历史
-        pushHistory(currentJson.value)
-        // 格式化并设置到编辑器
-        const newContent = JSON.stringify(jsonArray, null, 2)
-        currentJson.value = newContent
-        pushHistory(newContent)
-        validate()
-      } catch (error) {
-        console.error('Excel 导入失败:', error)
-        alert(`导入失败: ${error.message}`)
-      }
-    }
-
-    input.click()
+    // 记录历史
+    pushHistory(currentJson.value)
+    // 格式化并设置到编辑器
+    const newContent = JSON.stringify(jsonArray, null, 2)
+    currentJson.value = newContent
+    pushHistory(newContent)
+    validate()
   } catch (error) {
     console.error('Excel 导入失败:', error)
     alert(`导入失败: ${error.message}`)
@@ -956,90 +792,34 @@ const handleImportExcel = async () => {
 // 处理JSON/TXT文件导入
 const handleImportJson = async () => {
   try {
-    // 优先使用 uTools 的文件选择对话框
-    if (window.utools && window.utools.showOpenDialog) {
-      const files = window.utools.showOpenDialog({
-        title: '导入 JSON',
-        filters: [
-          { name: 'JSON 文件', extensions: ['json'] },
-          { name: '文本文件', extensions: ['txt'] }
-        ],
-        properties: ['openFile']
-      })
+    const result = await platformOpenDialog({
+      title: '导入 JSON',
+      filters: [
+        { name: 'JSON 文件', extensions: ['json'] },
+        { name: '文本文件', extensions: ['txt'] }
+      ]
+    })
 
-      if (!files || files.length === 0) {
-        // 用户取消选择
-        return
-      }
+    if (!result) return
 
-      const filePath = files[0]
+    const content = result.content
 
-      // 应用 preload 提供的文件读取功能
-      if (window.preloadUtils && window.preloadUtils.readFile) {
-        const content = window.preloadUtils.readFile(filePath, 'utf-8')
-
-        if (content === null || content === undefined) {
-          alert('读取文件失败')
-          return
-        }
-
-        // 验证是否为有效的 JSON
-        try {
-          JSON.parse(content)
-        } catch (error) {
-          alert(`文件内容不是有效的 JSON 格式: ${error.message}`)
-          return
-        }
-
-        // 记录历史
-        pushHistory(currentJson.value)
-        // 设置到编辑器
-        currentJson.value = content
-        // 自动格式化
-        format()
-        pushHistory(currentJson.value)
-        validate()
-
-        return
-      }
+    // 验证是否为有效的 JSON
+    try {
+      JSON.parse(content)
+    } catch (error) {
+      alert(`文件内容不是有效的 JSON 格式: ${error.message}`)
+      return
     }
 
-    // 浏览器环境下使用 HTML5 File API
-    const input = document.createElement('input')
-    input.type = 'file'
-    input.accept = '.json,.txt'
-
-    input.onchange = async (e) => {
-      const file = e.target.files[0]
-      if (!file) return
-
-      try {
-        // 读取文件内容
-        const content = await file.text()
-
-        // 验证是否为有效的 JSON
-        try {
-          JSON.parse(content)
-        } catch (error) {
-          alert(`文件内容不是有效的 JSON 格式: ${error.message}`)
-          return
-        }
-
-        // 记录历史
-        pushHistory(currentJson.value)
-        // 设置到编辑器
-        currentJson.value = content
-        // 自动格式化
-        format()
-        pushHistory(currentJson.value)
-        validate()
-      } catch (error) {
-        console.error('JSON 导入失败:', error)
-        alert(`导入失败: ${error.message}`)
-      }
-    }
-
-    input.click()
+    // 记录历史
+    pushHistory(currentJson.value)
+    // 设置到编辑器
+    currentJson.value = content
+    // 自动格式化
+    format()
+    pushHistory(currentJson.value)
+    validate()
   } catch (error) {
     console.error('JSON 导入失败:', error)
     alert(`导入失败: ${error.message}`)
@@ -1047,13 +827,12 @@ const handleImportJson = async () => {
 }
 
 // 处理Excel导出
-const handleExportExcel = () => {
+const handleExportExcel = async () => {
   try {
     // 验证当前 JSON 是否为数组格式
     const validation = validateJsonArray(currentJson.value)
 
     if (!validation.valid) {
-      // 显示错误和示例
       const example = getExportExample()
       alert(`${validation.error}\n\n${example}`)
       return
@@ -1062,48 +841,17 @@ const handleExportExcel = () => {
     // 将 JSON 转换为 Excel Buffer
     const buffer = jsonToExcel(validation.data)
 
-    // 生成默认文件名
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
     const defaultName = `json_export_${timestamp}.xlsx`
 
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '导出到 Excel',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'Excel 文件', extensions: ['xlsx'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        const success = window.preloadUtils.writeFile(filePath, buffer)
-
-        if (!success) {
-          alert('导出失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    await platformSaveDialog({
+      title: '导出到 Excel',
+      defaultPath: defaultName,
+      binaryContent: buffer,
+      filters: [
+        { name: 'Excel 文件', extensions: ['xlsx'] }
+      ]
     })
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
   } catch (error) {
     console.error('Excel 导出失败:', error)
     alert(`导出失败: ${error.message}`)
@@ -1111,55 +859,14 @@ const handleExportExcel = () => {
 }
 
 // 处理保存到本地文件
-const handleSaveToLocal = () => {
+const handleSaveToLocal = async () => {
   try {
     if (!currentJson.value || !currentJson.value.trim()) {
       alert('当前没有内容可保存')
       return
     }
 
-    // 生成默认文件名
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    const defaultName = `json_${timestamp}.json`
-
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '保存 JSON 到本地',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'JSON 文件', extensions: ['json'] },
-          { name: '文本文件', extensions: ['txt'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        // 确保当前 JSON 是格式化的
-        let contentToSave = currentJson.value
-        try {
-          const parsed = JSON.parse(contentToSave)
-          contentToSave = JSON.stringify(parsed, null, 2)
-        } catch (e) {
-          // 如果不是有效 JSON，直接保存原内容
-        }
-
-        const success = window.preloadUtils.writeFile(filePath, contentToSave)
-
-        if (!success) {
-          alert('保存失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
+    // 确保当前 JSON 是格式化的
     let contentToSave = currentJson.value
     try {
       const parsed = JSON.parse(contentToSave)
@@ -1168,16 +875,18 @@ const handleSaveToLocal = () => {
       // 如果不是有效 JSON，直接保存原内容
     }
 
-    const blob = new Blob([contentToSave], {
-      type: 'application/json;charset=utf-8'
-    })
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+    const defaultName = `json_${timestamp}.json`
 
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
+    await platformSaveDialog({
+      title: '保存 JSON 到本地',
+      defaultPath: defaultName,
+      content: contentToSave,
+      filters: [
+        { name: 'JSON 文件', extensions: ['json'] },
+        { name: '文本文件', extensions: ['txt'] }
+      ]
+    })
   } catch (error) {
     console.error('保存到本地失败:', error)
     alert(`保存失败: ${error.message}`)

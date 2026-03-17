@@ -1,5 +1,6 @@
-// utools.db storage composable
+// Storage composable using platform abstraction
 import { ref } from 'vue'
+import { dbPut, dbGet, dbGetAll, dbRemove } from '../platform/index.js'
 
 export function useJsonStorage() {
   const documents = ref([])
@@ -19,21 +20,13 @@ export function useJsonStorage() {
       size: new Blob([content]).size
     }
 
-    if (window.utools && window.utools.db) {
-      const result = window.utools.db.put(doc)
+    const result = dbPut(doc._id, doc)
 
-      if (result.ok) {
-        doc._rev = result.rev
-        documents.value.unshift(doc)
-        return doc
-      } else {
-        throw new Error(result.message || 'Save failed')
-      }
-    } else {
-      // Fallback for development without utools
+    if (result.ok) {
       documents.value.unshift(doc)
-      console.log('Saved (dev mode):', doc)
       return doc
+    } else {
+      throw new Error(result.message || 'Save failed')
     }
   }
 
@@ -41,13 +34,8 @@ export function useJsonStorage() {
   const loadDocuments = () => {
     loading.value = true
     try {
-      if (window.utools && window.utools.db) {
-        const docs = window.utools.db.allDocs('json_doc_')
-        documents.value = docs.sort((a, b) => b.timestamp - a.timestamp)
-      } else {
-        // Dev mode - no documents
-        documents.value = []
-      }
+      const docs = dbGetAll('json_doc_')
+      documents.value = docs.sort((a, b) => b.timestamp - a.timestamp)
     } finally {
       loading.value = false
     }
@@ -55,22 +43,14 @@ export function useJsonStorage() {
 
   // Delete document
   const deleteDocument = (doc) => {
-    if (window.utools && window.utools.db) {
-      // uTools db.remove() 需要传入 _id 和 _rev
-      const result = window.utools.db.remove(doc._id)
+    const result = dbRemove(doc._id)
 
-      if (result.ok) {
-        documents.value = documents.value.filter(d => d._id !== doc._id)
-        return true
-      } else {
-        console.error('Delete failed:', result)
-        return false
-      }
-    } else {
-      // Dev mode
+    if (result.ok) {
       documents.value = documents.value.filter(d => d._id !== doc._id)
-      console.log('Deleted (dev mode):', doc)
       return true
+    } else {
+      console.error('Delete failed:', result)
+      return false
     }
   }
 
@@ -80,19 +60,12 @@ export function useJsonStorage() {
     doc.preview = doc.content.slice(0, 100)
     doc.size = new Blob([doc.content]).size
 
-    if (window.utools && window.utools.db) {
-      const result = window.utools.db.put(doc)
+    const result = dbPut(doc._id, doc)
 
-      if (result.ok) {
-        doc._rev = result.rev
-        return doc
-      } else {
-        throw new Error(result.message || 'Update failed')
-      }
-    } else {
-      // Dev mode
-      console.log('Updated (dev mode):', doc)
+    if (result.ok) {
       return doc
+    } else {
+      throw new Error(result.message || 'Update failed')
     }
   }
 
