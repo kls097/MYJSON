@@ -325,6 +325,27 @@ input:focus, select:focus, textarea:focus {
   gap: 12px !important;
 }
 
+/* 搜索计数显示 */
+.cm-panel.cm-search .cm-textfield {
+  min-width: 200px !important;
+}
+
+.cm-panel.cm-search .cm-search-count {
+  font-size: 13px !important;
+  color: var(--text-secondary) !important;
+  padding: 4px 8px !important;
+  background: var(--bg-secondary) !important;
+  border-radius: 4px !important;
+  min-width: 60px !important;
+  text-align: center !important;
+  font-weight: 500 !important;
+}
+
+.cm-panel.cm-search .cm-search-count:not(:empty) {
+  color: var(--primary) !important;
+  background: var(--primary-light) !important;
+}
+
 /* CodeMirror 编辑器字体 */
 .cm-editor {
   font-family: var(--font-code) !important;
