@@ -140,6 +140,15 @@
         :stats="stats"
         :validation-result="validationResult"
       />
+
+      <ToastNotification
+        v-model="toast.show"
+        :type="toast.type"
+        :title="toast.title"
+        :message="toast.message"
+        :duration="toast.duration"
+        :action="toast.action"
+      />
     </template>
   </div>
 </template>
@@ -167,6 +176,7 @@ import { useClipboard } from './composables/useClipboard'
 import { useHistory } from './composables/useHistory'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
+import ToastNotification from './components/ToastNotification.vue'
 
 const {
   currentJson,
@@ -195,6 +205,26 @@ const showCompareMode = ref(false)
 const showMergeMode = ref(false)
 const showThreeWayMergeMode = ref(false)
 const showTableMode = ref(false)
+
+// Toast 通知状态
+const toast = reactive({
+  show: false,
+  type: 'info',
+  title: '',
+  message: '',
+  duration: 5000,
+  action: null
+})
+
+// 显示 toast 的快捷方法
+const showToast = (options) => {
+  toast.show = true
+  toast.type = options.type || 'info'
+  toast.title = options.title || ''
+  toast.message = options.message || ''
+  toast.duration = options.duration ?? 5000
+  toast.action = options.action || null
+}
 const tableData = ref([])
 const compareViewRef = ref(null)
 const editorRef = ref(null)  // JsonEditor 组件引用
@@ -580,26 +610,47 @@ const handleFixJson = () => {
   const result = fixJson(oldContent)
 
   if (result.success) {
-    const message = getFixMessage(result)
+    const friendlyFixes = result.fixes.map(fix => {
+      const fixTypeMap = {
+        'JSON格式正确，无需修复': '格式验证通过',
+        'jsonrepair修复(专业修复库)': '自动修复格式错误',
+        'JSON5修复(单引号/注释/尾随逗号/无引号键名)': '修复JSON5格式',
+        '基础预处理': '预处理特殊格式',
+        'jsonrepair修复': '智能修复',
+        'JSON5解析': '兼容性解析',
+        '深度预处理': '深度格式处理'
+      }
+      return fixTypeMap[fix] || fix
+    })
 
-    if (confirm(message)) {
-      pushHistory(oldContent)
-      currentJson.value = result.fixed
-      // 尝试格式化
-      format()
-      pushHistory(currentJson.value)
-      validate()
-    }
+    const fixSummary = friendlyFixes.join('、')
+
+    pushHistory(oldContent)
+    currentJson.value = result.fixed
+    format()
+    pushHistory(currentJson.value)
+    validate()
+
+    showToast({
+      type: 'success',
+      title: 'JSON 修复完成',
+      message: fixSummary,
+      duration: 5000,
+      action: {
+        text: '撤销',
+        onClick: () => {
+          undo()
+        },
+        autoClose: true
+      }
+    })
   } else {
-    // 修复失败，显示错误信息
-    let message = '❌ 自动修复失败\n\n'
-    message += '抱歉，无法自动修复您的JSON。\n\n'
-    message += '可能的原因：\n'
-    message += '• 格式严重错误\n'
-    message += '• 包含不支持的语法\n'
-    message += '• 数据结构不完整\n\n'
-    message += '建议：请手动检查并修正格式问题。'
-    alert(message)
+    showToast({
+      type: 'error',
+      title: '自动修复失败',
+      message: '无法自动修复您的 JSON，请手动检查格式问题。\n\n建议：检查是否有结构性损坏或不支持的语法。',
+      duration: 8000
+    })
   }
 }
 
