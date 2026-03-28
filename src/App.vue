@@ -45,6 +45,7 @@
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
         :opened-file-path="openedFilePath"
+        :has-snapshots="hasSnapshots()"
         @format="handleFormat"
         @compress="handleCompress"
         @remove-comments="handleRemoveComments"
@@ -65,6 +66,7 @@
         @open-compare="handleOpenCompare"
         @open-merge="handleOpenMerge"
         @open-three-way-merge="handleOpenThreeWayMerge"
+        @compare-last-snapshot="handleCompareLastSnapshot"
       />
 
       <div class="main-content">
@@ -174,6 +176,7 @@ import { useJsonOperations } from './composables/useJsonOperations'
 import { useJsonStorage } from './composables/useJsonStorage'
 import { useClipboard } from './composables/useClipboard'
 import { useHistory } from './composables/useHistory'
+import { useSnapshots } from './composables/useSnapshots'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
 import ToastNotification from './components/ToastNotification.vue'
@@ -193,6 +196,7 @@ const {
 const { saveDocument } = useJsonStorage()
 const { copyToClipboard } = useClipboard()
 const { canUndo, canRedo, pushHistory, undo, redo, initHistory, isUndoRedo } = useHistory()
+const { snapshots, saveSnapshot, hasSnapshots, getLastSnapshot, clearSnapshots } = useSnapshots()
 
 const showHistory = ref(false)
 const showSaveDialog = ref(false)
@@ -492,6 +496,7 @@ onUnmounted(() => {
 // Event handlers
 const handleFormat = () => {
   const oldContent = currentJson.value
+  saveSnapshot(oldContent, '格式化前')
   editorRef.value?.saveCursorState?.()
   if (format()) {
     pushHistory(oldContent)
@@ -502,6 +507,7 @@ const handleFormat = () => {
 
 const handleCompress = (escape) => {
   const oldContent = currentJson.value
+  saveSnapshot(oldContent, '压缩前')
   editorRef.value?.saveCursorState?.()
   if (compress(escape)) {
     pushHistory(oldContent)
@@ -614,6 +620,7 @@ const getFixMessage = (result) => {
 // 处理JSON修复
 const handleFixJson = () => {
   const oldContent = currentJson.value
+  saveSnapshot(oldContent, '修复前')
   const result = fixJson(oldContent)
 
   if (result.success) {
@@ -747,6 +754,18 @@ const mergeInitialRight = ref('')
 // 打开三方合并视图
 const handleOpenThreeWayMerge = () => {
   showThreeWayMergeMode.value = true
+}
+
+// 对比上次快照
+const handleCompareLastSnapshot = () => {
+  const snapshot = getLastSnapshot()
+  if (!snapshot) return
+  showCompareMode.value = true
+  nextTick(() => {
+    if (compareViewRef.value) {
+      compareViewRef.value.setInitialData(snapshot.content, currentJson.value)
+    }
+  })
 }
 
 // 关闭合并视图

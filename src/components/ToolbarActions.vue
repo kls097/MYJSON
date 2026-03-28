@@ -182,6 +182,13 @@
             <span class="dropdown-item-icon">📈</span>
             导出为表格
           </button>
+          <template v-if="hasSnapshots">
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item" @click="handleDropdownAction('compare-last-snapshot')">
+              <span class="dropdown-item-icon">📸</span>
+              对比上次快照
+            </button>
+          </template>
         </div>
       </div>
     </div>
@@ -223,6 +230,10 @@ const props = defineProps({
   openedFilePath: {
     type: String,
     default: ''
+  },
+  hasSnapshots: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -246,7 +257,8 @@ const emit = defineEmits([
   'export-excel',
   'open-compare',
   'open-merge',
-  'open-three-way-merge'
+  'open-three-way-merge',
+  'compare-last-snapshot'
 ])
 
 const showDropdown = ref(false)
