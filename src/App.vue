@@ -39,6 +39,7 @@
         :show-query="showQueryPanel"
         :show-convert="showConvertPanel"
         :show-schema="showSchemaPanel"
+        :show-bookmark="showBookmarkPanel"
         :view-mode="currentViewMode"
         :can-undo="false"
         :can-redo="false"
@@ -58,6 +59,7 @@
         @toggle-query="showQueryPanel = !showQueryPanel"
         @toggle-convert="showConvertPanel = !showConvertPanel"
         @toggle-schema="showSchemaPanel = !showSchemaPanel"
+        @toggle-bookmark="showBookmarkPanel = !showBookmarkPanel"
         @change-view="handleViewChange"
         @import-json="handleImportJson"
         @save-to-local="handleSaveToLocal"
@@ -131,6 +133,16 @@
         @jump-to-error="handleJumpToError"
       />
 
+      <BookmarkPanel
+        v-if="showBookmarkPanel"
+        :visible="showBookmarkPanel"
+        :bookmarks="bookmarks"
+        @close="showBookmarkPanel = false"
+        @save="handleSaveBookmark"
+        @load="handleLoadBookmark"
+        @remove="removeBookmark"
+      />
+
       <SaveDialog
         :is-open="showSaveDialog"
         :default-name="defaultSaveName"
@@ -172,11 +184,13 @@ import JsonMergePanel from './components/JsonMergePanel.vue'
 import ThreeWayMergeView from './components/ThreeWayMergeView.vue'
 import TableView from './components/TableView.vue'
 import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
+import BookmarkPanel from './components/BookmarkPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
 import { useJsonStorage } from './composables/useJsonStorage'
 import { useClipboard } from './composables/useClipboard'
 import { useHistory } from './composables/useHistory'
 import { useSnapshots } from './composables/useSnapshots'
+import { useBookmarks } from './composables/useBookmarks'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
 import ToastNotification from './components/ToastNotification.vue'
@@ -197,12 +211,14 @@ const { saveDocument } = useJsonStorage()
 const { copyToClipboard } = useClipboard()
 const { canUndo, canRedo, pushHistory, undo, redo, initHistory, isUndoRedo } = useHistory()
 const { snapshots, saveSnapshot, hasSnapshots, getLastSnapshot, clearSnapshots } = useSnapshots()
+const { bookmarks, addBookmark, removeBookmark } = useBookmarks()
 
 const showHistory = ref(false)
 const showSaveDialog = ref(false)
 const showQueryPanel = ref(false)  // 默认隐藏查询面板
 const showConvertPanel = ref(false)  // 默认隐藏转换面板
 const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
+const showBookmarkPanel = ref(false)  // 默认隐藏收藏面板
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
@@ -1313,6 +1329,21 @@ const handleSaveToLocal = () => {
     console.error('保存到本地失败:', error)
     alert(`保存失败: ${error.message}`)
   }
+}
+
+// ============ 书签/收藏相关方法 ============
+
+const handleSaveBookmark = (name) => {
+  if (!currentJson.value || !currentJson.value.trim()) return
+  addBookmark(name, currentJson.value)
+}
+
+const handleLoadBookmark = (content) => {
+  pushHistory(currentJson.value)
+  currentJson.value = content
+  pushHistory(content)
+  validate()
+  showBookmarkPanel.value = false
 }
 
 // ============ Schema 面板相关方法 ============

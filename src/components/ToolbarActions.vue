@@ -128,6 +128,14 @@
       >
         {{ showSchema ? '隐藏Schema' : 'Schema' }}
       </button>
+      <button
+        class="btn btn-sm btn-secondary"
+        @click="$emit('toggle-bookmark')"
+        :class="{ active: showBookmark }"
+        title="收藏夹"
+      >
+        {{ showBookmark ? '隐藏收藏' : '收藏' }}
+      </button>
     </div>
 
     <div class="toolbar-section dropdown-section">
@@ -234,6 +242,10 @@ const props = defineProps({
   hasSnapshots: {
     type: Boolean,
     default: false
+  },
+  showBookmark: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -258,7 +270,8 @@ const emit = defineEmits([
   'open-compare',
   'open-merge',
   'open-three-way-merge',
-  'compare-last-snapshot'
+  'compare-last-snapshot',
+  'toggle-bookmark'
 ])
 
 const showDropdown = ref(false)
