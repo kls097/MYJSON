@@ -34,6 +34,17 @@
 
     <!-- 原有编辑模式 -->
     <template v-else>
+      <!-- 拖拽遮罩 -->
+      <div
+        v-if="isDragging"
+        class="drop-overlay"
+      >
+        <div class="drop-overlay__content">
+          <span class="drop-overlay__icon">📄</span>
+          <span>松开以打开 JSON 文件</span>
+        </div>
+      </div>
+
       <ToolbarActions
         :has-content="!!currentJson"
         :show-query="showQueryPanel"
@@ -250,6 +261,57 @@ const compareViewRef = ref(null)
 const editorRef = ref(null)  // JsonEditor 组件引用
 const openedFilePath = ref('')  // 通过文件入口打开的文件路径
 
+// 拖拽文件状态
+const isDragging = ref(false)
+let dragCounter = 0
+
+const handleDragEnter = (e) => {
+  e.preventDefault()
+  dragCounter++
+  isDragging.value = true
+}
+
+const handleDragLeave = (e) => {
+  e.preventDefault()
+  dragCounter--
+  if (dragCounter <= 0) {
+    dragCounter = 0
+    isDragging.value = false
+  }
+}
+
+const handleDragOver = (e) => {
+  e.preventDefault()
+}
+
+const handleDrop = async (e) => {
+  e.preventDefault()
+  dragCounter = 0
+  isDragging.value = false
+
+  const files = e.dataTransfer?.files
+  if (!files || files.length === 0) return
+
+  const file = files[0]
+  if (!file.name.match(/\.(json|txt)$/i)) {
+    showToast({ type: 'warning', title: '不支持', message: '请拖入 .json 或 .txt 文件' })
+    return
+  }
+
+  try {
+    const content = await file.text()
+    pushHistory(currentJson.value)
+    currentJson.value = content
+    initHistory(content)
+    format()
+    pushHistory(currentJson.value)
+    validate()
+    showToast({ type: 'success', title: '文件已打开', message: file.name })
+  } catch (error) {
+    showToast({ type: 'error', title: '打开失败', message: error.message })
+  }
+}
+
 // 检测是否需要修复
 const needsFixJson = computed(() => {
   if (!currentJson.value || !currentJson.value.trim()) return false
@@ -306,6 +368,11 @@ provide('parsedJson', parsedJson)
 onMounted(() => {
   // 添加全局快捷键监听
   document.addEventListener('keydown', handleKeydown)
+  // 拖拽文件支持
+  document.addEventListener('dragenter', handleDragEnter)
+  document.addEventListener('dragleave', handleDragLeave)
+  document.addEventListener('dragover', handleDragOver)
+  document.addEventListener('drop', handleDrop)
 
   if (window.utools && window.utools.onPluginEnter) {
     window.utools.onPluginEnter(({ code, type, payload }) => {
@@ -507,6 +574,10 @@ const handleKeydown = (event) => {
 // 清理事件监听器
 onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('dragenter', handleDragEnter)
+  document.removeEventListener('dragleave', handleDragLeave)
+  document.removeEventListener('dragover', handleDragOver)
+  document.removeEventListener('drop', handleDrop)
 })
 
 // Event handlers
@@ -1397,5 +1468,33 @@ const handleJumpToError = (error) => {
 
 .main-content > * {
   flex: 1;
+}
+
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(4px);
+}
+
+.drop-overlay__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 60px;
+  border: 2px dashed var(--primary, #4a9eff);
+  border-radius: 16px;
+  background: var(--bg-primary, #1e1e2e);
+  color: var(--text-primary, #cdd6f4);
+  font-size: 16px;
+}
+
+.drop-overlay__icon {
+  font-size: 48px;
 }
 </style>

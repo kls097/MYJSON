@@ -924,7 +924,7 @@ export function needsFix(jsonStr) {
   if (/\/\//.test(trimmed) || /\/\*/.test(trimmed)) {
     return { needs: true, hint: '检测到注释' }
   }
-  if (/{\s*,|[\s*,/.test(trimmed)) {
+  if (/{\s*,|\[\s*,/.test(trimmed)) {
     return { needs: true, hint: '检测到多余逗号' }
   }
   if (/ObjectId\s*\(|ISODate\s*\(|NumberLong\s*\(/.test(trimmed)) {
