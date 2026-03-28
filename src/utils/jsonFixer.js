@@ -898,17 +898,47 @@ function fixUnmatchedBrackets(str) {
 /**
  * 检查JSON是否需要修复
  * @param {string} jsonStr - JSON字符串
- * @returns {boolean} 是否需要修复
+ * @returns {{ needs: boolean, hint: string }} 是否需要修复 + 提示信息
  */
 export function needsFix(jsonStr) {
   if (!jsonStr || typeof jsonStr !== 'string') {
-    return false
+    return { needs: false, hint: '' }
+  }
+
+  const trimmed = jsonStr.trim()
+  if (!trimmed) return { needs: false, hint: '' }
+
+  // 快速检查常见问题，给出精确提示
+  if (/,\s*[}\]]/.test(trimmed)) {
+    return { needs: true, hint: '检测到尾随逗号' }
+  }
+  if (/'[^']*\s*:/.test(trimmed) && !trimmed.includes('"')) {
+    return { needs: true, hint: '检测到单引号键名' }
+  }
+  if (/^\s*(True|False|None)\b/.test(trimmed)) {
+    return { needs: true, hint: '检测到 Python 风格字面量' }
+  }
+  if (/NaN|Infinity|undefined/.test(trimmed) && !/["'].*NaN/.test(trimmed)) {
+    return { needs: true, hint: '检测到非法 JSON 值 (NaN/Infinity/undefined)' }
+  }
+  if (/\/\//.test(trimmed) || /\/\*/.test(trimmed)) {
+    return { needs: true, hint: '检测到注释' }
+  }
+  if (/{\s*,|[\s*,/.test(trimmed)) {
+    return { needs: true, hint: '检测到多余逗号' }
+  }
+  if (/ObjectId\s*\(|ISODate\s*\(|NumberLong\s*\(/.test(trimmed)) {
+    return { needs: true, hint: '检测到 MongoDB 类型' }
   }
 
   try {
-    JSON.parse(jsonStr)
-    return false
+    JSON.parse(trimmed)
+    return { needs: false, hint: '' }
   } catch (e) {
-    return true
+    const msg = e.message || ''
+    if (msg.includes('position')) {
+      return { needs: true, hint: `JSON 解析错误: ${msg}` }
+    }
+    return { needs: true, hint: 'JSON 格式有误' }
   }
 }

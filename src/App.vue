@@ -253,7 +253,7 @@ const openedFilePath = ref('')  // 通过文件入口打开的文件路径
 // 检测是否需要修复
 const needsFixJson = computed(() => {
   if (!currentJson.value || !currentJson.value.trim()) return false
-  return checkNeedsFix(currentJson.value)
+  return checkNeedsFix(currentJson.value).needs
 })
 
 // 检测是否可以打开表格视图（JSON必须是有效数组）
