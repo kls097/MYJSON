@@ -702,7 +702,7 @@ watch(() => props.modelValue, (newValue) => {
   }
 })
 
-defineExpose({ openSearch, saveCursorState, restoreCursorState })
+defineExpose({ openSearch: () => openSearchPanel(editorView), saveCursorState, restoreCursorState })
 
 const validateJson = (content) => {
   if (!content.trim()) {
