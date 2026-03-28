@@ -492,36 +492,43 @@ onUnmounted(() => {
 // Event handlers
 const handleFormat = () => {
   const oldContent = currentJson.value
+  editorRef.value?.saveCursorState?.()
   if (format()) {
     pushHistory(oldContent)
     pushHistory(currentJson.value)
+    nextTick(() => editorRef.value?.restoreCursorState?.())
   }
 }
 
 const handleCompress = (escape) => {
   const oldContent = currentJson.value
+  editorRef.value?.saveCursorState?.()
   if (compress(escape)) {
     pushHistory(oldContent)
     pushHistory(currentJson.value)
+    nextTick(() => editorRef.value?.restoreCursorState?.())
     copyToClipboard(currentJson.value)
   }
 }
 
 const handleRemoveComments = () => {
   const oldContent = currentJson.value
+  editorRef.value?.saveCursorState?.()
   if (stripComments()) {
     pushHistory(oldContent)
     pushHistory(currentJson.value)
+    nextTick(() => editorRef.value?.restoreCursorState?.())
   }
 }
 
 const handleUnescape = () => {
   const oldContent = currentJson.value
+  editorRef.value?.saveCursorState?.()
   if (unescape()) {
     pushHistory(oldContent)
-    // 去转义成功后，尝试自动格式化
     format()
     pushHistory(currentJson.value)
+    nextTick(() => editorRef.value?.restoreCursorState?.())
   }
 }
 

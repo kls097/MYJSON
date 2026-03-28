@@ -57,6 +57,39 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'validate', 'extract-to-editor', 'extract-path'])
 
+// 光标/滚动状态保存与恢复
+let savedCursorState = null
+
+const saveCursorState = () => {
+  if (!editorView) return
+  const state = editorView.state
+  const sel = state.selection.main
+  savedCursorState = {
+    from: sel.from,
+    to: sel.to,
+    scrollDOM: editorView.scrollDOM?.scrollTop || 0,
+    totalDocLength: state.doc.length
+  }
+}
+
+const restoreCursorState = () => {
+  if (!editorView || !savedCursorState) return
+  // 根据新旧文档长度按比例映射光标位置
+  const oldLen = savedCursorState.totalDocLength || 1
+  const newLen = editorView.state.doc.length
+  const ratio = newLen / oldLen
+  const newFrom = Math.min(Math.round(savedCursorState.from * ratio), newLen)
+  const newTo = Math.min(Math.round(savedCursorState.to * ratio), newLen)
+  editorView.dispatch({
+    selection: { anchor: newFrom, head: newTo }
+  })
+  requestAnimationFrame(() => {
+    if (editorView.scrollDOM) {
+      editorView.scrollDOM.scrollTop = savedCursorState.scrollDOM * ratio
+    }
+  })
+}
+
 const editorRef = ref(null)
 let editorView = null
 
@@ -626,6 +659,8 @@ watch(() => props.modelValue, (newValue) => {
     })
   }
 })
+
+defineExpose({ openSearch, saveCursorState, restoreCursorState })
 
 const validateJson = (content) => {
   if (!content.trim()) {

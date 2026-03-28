@@ -147,3 +147,5 @@ dist
 !/CLAUDE.md
 !/myjson-plugin.upx
 !/docs/
+test-results/
+小鬼的测试/
