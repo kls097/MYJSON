@@ -35,6 +35,14 @@
       >
         复制
       </button>
+      <div v-if="currentPath && currentPath !== '$'" class="context-menu-divider"></div>
+      <button 
+        v-if="currentPath && currentPath !== '$'"
+        class="context-menu-item" 
+        @click="copyJsonPath"
+      >
+        复制 JSONPath
+      </button>
     </div>
   </div>
 </template>
@@ -546,6 +554,14 @@ const extractPathContent = () => {
   showContextMenu.value = false
 }
 
+// 复制 JSONPath
+const copyJsonPath = () => {
+  if (currentPath.value) {
+    copyToClipboard(currentPath.value)
+  }
+  showContextMenu.value = false
+}
+
 // 点击其他地方关闭右键菜单
 const closeContextMenu = () => {
   if (showContextMenu.value) {
@@ -750,6 +766,12 @@ const validateJson = (content) => {
 .context-menu-item:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.context-menu-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 4px 0;
 }
 
 /* 自定义搜索面板样式 */
