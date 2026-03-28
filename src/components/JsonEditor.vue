@@ -31,6 +31,13 @@
       </button>
       <button 
         class="context-menu-item" 
+        @click="formatSelection"
+        :disabled="!hasSelection"
+      >
+        格式化选中部分
+      </button>
+      <button 
+        class="context-menu-item" 
         @click="copySelection"
       >
         复制
@@ -550,6 +557,22 @@ const extractPathContent = () => {
     } catch (e) {
       console.error('Failed to extract path content:', e)
     }
+  }
+  showContextMenu.value = false
+}
+
+// 格式化选中部分
+const formatSelection = () => {
+  if (!editorView || !selectedText.value) return
+  try {
+    const parsed = JSON.parse(selectedText.value)
+    const formatted = JSON.stringify(parsed, null, 2)
+    const { from, to } = editorView.state.selection.main
+    editorView.dispatch({
+      changes: { from, to, insert: formatted }
+    })
+  } catch {
+    // 不是有效 JSON，忽略
   }
   showContextMenu.value = false
 }
