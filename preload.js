@@ -77,7 +77,7 @@ window.preloadUtils = {
 
   /**
    * 读取文件内容
-   * @param {string} filePath - 文件路径（相对于插件目录）
+   * @param {string} filePath - 文件路径（可以是绝对路径或相对于插件目录的相对路径）
    * @returns {string|Buffer|null} 文件内容
    */
   readFile: (filePath, encoding = 'utf-8') => {
@@ -87,8 +87,16 @@ window.preloadUtils = {
     }
 
     try {
-      // 转换为绝对路径
-      const absolutePath = path.resolve(getPluginDir(), filePath)
+      // 判断是否是绝对路径
+      let absolutePath
+      if (path.isAbsolute(filePath)) {
+        // 如果已经是绝对路径，直接使用
+        absolutePath = filePath
+      } else {
+        // 否则转换为相对于插件目录的绝对路径
+        absolutePath = path.resolve(getPluginDir(), filePath)
+      }
+
       if (encoding) {
         return fs.readFileSync(absolutePath, encoding)
       } else {
@@ -96,13 +104,13 @@ window.preloadUtils = {
       }
     } catch (error) {
       console.error('读取文件失败:', error)
-      return null
+      throw error  // 抛出错误以便上层捕获
     }
   },
 
   /**
    * 写入文件内容
-   * @param {string} filePath - 文件路径（相对于插件目录）
+   * @param {string} filePath - 文件路径（可以是绝对路径或相对于插件目录的相对路径��
    * @param {string|Buffer} content - 文件内容
    * @returns {boolean} 是否成功
    */
@@ -112,8 +120,13 @@ window.preloadUtils = {
     }
 
     try {
-      // 转换为绝对路径
-      const absolutePath = path.resolve(getPluginDir(), filePath)
+      // 判断是否是绝对路径
+      let absolutePath
+      if (path.isAbsolute(filePath)) {
+        absolutePath = filePath
+      } else {
+        absolutePath = path.resolve(getPluginDir(), filePath)
+      }
       const dir = path.dirname(absolutePath)
 
       // 确保目录存在

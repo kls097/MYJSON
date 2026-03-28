@@ -8,22 +8,22 @@
           {{ viewModeLabel }} ▾
         </button>
         <div v-if="showViewDropdown" class="dropdown-menu dropdown-menu-left">
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('code')"
           >
             <span class="dropdown-item-icon">📝</span>
             代码视图
           </button>
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('tree')"
           >
             <span class="dropdown-item-icon">🌳</span>
             树形视图
           </button>
-          <button 
-            class="dropdown-item" 
+          <button
+            class="dropdown-item"
             @click="handleViewChange('table')"
             :disabled="!canOpenTable"
           >
@@ -33,6 +33,20 @@
           </button>
         </div>
       </div>
+      <!-- 保存到本地文件按钮 - 仅在通过文件入口打开时显示 -->
+      <button
+        v-if="openedFilePath"
+        class="btn btn-icon has-tooltip btn-save-file"
+        @click="$emit('save-to-file')"
+        :disabled="!hasContent"
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        <span class="tooltip">保存到本地</span>
+      </button>
     </div>
 
     <div class="toolbar-section format-section">
@@ -49,7 +63,7 @@
       <!-- 压缩: 紧凑花括号 -->
       <button class="btn btn-icon has-tooltip" @click="$emit('compress', false)" :disabled="!hasContent">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M6 6c-2 0-2 2-2 3s0 2 2 3c-2 1-2 2-2 3s0 3 2 3"/>
+          <path d="M6 6c-2 0-2 2-2 3s0 2 2 3c-2 1-2 2-2 3s0 2 2 3"/>
           <path d="M18 6c2 0 2 2 2 3s0 2-2 3c2 1 2 2 2 3s0 3-2 3"/>
           <circle cx="10" cy="12" r="1" fill="currentColor" stroke="none"/>
           <circle cx="14" cy="12" r="1" fill="currentColor" stroke="none"/>
@@ -77,6 +91,14 @@
         </svg>
         <span class="tooltip">去转义</span>
       </button>
+      <!-- 搜索与替换: 放大镜 -->
+      <button class="btn btn-icon has-tooltip" @click="$emit('open-search')" :disabled="!hasContent">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="10" cy="10" r="7"/>
+          <path d="M21 21l-6-6"/>
+        </svg>
+        <span class="tooltip">搜索与替换</span>
+      </button>
       <!-- 修复JSON: 仅当JSON格式错误时显示 -->
       <button 
         v-if="needsFix" 
@@ -98,9 +120,9 @@
       <button class="btn btn-sm btn-secondary" @click="$emit('toggle-convert')" title="显示/隐藏转换面板">
         {{ showConvert ? '隐藏转换' : '转换' }}
       </button>
-      <button 
-        class="btn btn-sm btn-schema" 
-        @click="$emit('toggle-schema')" 
+      <button
+        class="btn btn-sm btn-secondary"
+        @click="$emit('toggle-schema')"
         :class="{ active: showSchema }"
         title="Schema 工作台"
       >
@@ -123,9 +145,21 @@
             <span class="dropdown-item-icon">📜</span>
             历史记录
           </button>
+          <button class="dropdown-item" @click="handleDropdownAction('toggle-schema')">
+            <span class="dropdown-item-icon">📝</span>
+            Schema 验证
+          </button>
           <button class="dropdown-item" @click="handleDropdownAction('open-compare')">
             <span class="dropdown-item-icon">⚖️</span>
             比较视图
+          </button>
+          <button class="dropdown-item" @click="handleDropdownAction('open-merge')">
+            <span class="dropdown-item-icon">🔀</span>
+            智能合并
+          </button>
+          <button class="dropdown-item" @click="handleDropdownAction('open-three-way-merge')">
+            <span class="dropdown-item-icon">🔃</span>
+            三方合并
           </button>
           <button class="dropdown-item" @click="handleDropdownAction('remove-comments')" :disabled="!hasContent">
             <span class="dropdown-item-icon">🗑️</span>
@@ -145,7 +179,7 @@
             从表格导入
           </button>
           <button class="dropdown-item" @click="handleDropdownAction('export-excel')" :disabled="!hasContent">
-            <span class="dropdown-item-icon">📤</span>
+            <span class="dropdown-item-icon">📈</span>
             导出为表格
           </button>
         </div>
@@ -185,16 +219,10 @@ const props = defineProps({
   canOpenTable: {
     type: Boolean,
     default: false
-  }
-})
-
-// 视图模式标签
-const viewModeLabel = computed(() => {
-  switch (props.viewMode) {
-    case 'code': return '代码'
-    case 'tree': return '树形'
-    case 'table': return '表格'
-    default: return '视图'
+  },
+  openedFilePath: {
+    type: String,
+    default: ''
   }
 })
 
@@ -204,6 +232,8 @@ const emit = defineEmits([
   'remove-comments',
   'unescape',
   'fix-json',
+  'open-search',
+  'save-to-file',
   'save',
   'toggle-history',
   'toggle-query',
@@ -214,13 +244,24 @@ const emit = defineEmits([
   'save-to-local',
   'import-excel',
   'export-excel',
-  'open-compare'
+  'open-compare',
+  'open-merge',
+  'open-three-way-merge'
 ])
 
 const showDropdown = ref(false)
 const dropdownRef = ref(null)
 const showViewDropdown = ref(false)
 const viewDropdownRef = ref(null)
+
+const viewModeLabel = computed(() => {
+  switch (props.viewMode) {
+    case 'code': return '代码'
+    case 'tree': return '树形'
+    case 'table': return '表格'
+    default: return '视图'
+  }
+})
 
 const toggleDropdown = () => {
   showDropdown.value = !showDropdown.value
@@ -281,11 +322,6 @@ onUnmounted(() => {
 .toolbar-section:not(:last-child) {
   padding-right: 16px;
   border-right: 1px solid var(--border);
-}
-
-.dropdown-section {
-  border-right: none !important;
-  padding-right: 0 !important;
 }
 
 .dropdown {
@@ -441,6 +477,19 @@ onUnmounted(() => {
   min-width: 160px;
 }
 
+/* 保存文件按钮 */
+.btn-save-file {
+  background: var(--success-bg, #d4edda);
+  border-color: var(--success, #28a745);
+  color: var(--success, #28a745);
+}
+
+.btn-save-file:hover:not(:disabled) {
+  background: var(--success, #28a745);
+  border-color: var(--success, #28a745);
+  color: #fff;
+}
+
 .dropdown-menu-left {
   left: 0;
   right: auto;
@@ -451,23 +500,5 @@ onUnmounted(() => {
   font-size: 11px;
   opacity: 0.5;
   flex-shrink: 0;
-}
-
-/* Schema 按钮 */
-.btn-schema {
-  background: #6f42c1;
-  border-color: #6f42c1;
-  color: white;
-}
-
-.btn-schema:hover {
-  background: #5a32a3;
-  border-color: #5a32a3;
-}
-
-.btn-schema.active {
-  background: #5a32a3;
-  border-color: #5a32a3;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 </style>

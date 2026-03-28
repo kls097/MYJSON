@@ -149,24 +149,35 @@ export function useJsonComparison() {
   }
 
   // 格式化两边
-  const formatBoth = () => {
+  const formatBoth = (rawLeftContent, rawRightContent) => {
     try {
+      // 如果提供了原始编辑器内容，优先使用它们（避免 extractOriginalJson 导致的数据损坏）
+      let leftContent = leftJson.value
+      let rightContent = rightJson.value
+
+      if (rawLeftContent !== undefined && rawLeftContent !== null) {
+        leftContent = extractJsonFromAligned(rawLeftContent, alignedLeft.value, lineTypes.value, 'left')
+      }
+      if (rawRightContent !== undefined && rawRightContent !== null) {
+        rightContent = extractJsonFromAligned(rawRightContent, alignedRight.value, lineTypes.value, 'right')
+      }
+
       // 只有在JSON有效时才格式化
       let leftValid = true, rightValid = true
 
       try {
-        if (leftJson.value.trim()) {
-          JSON.parse(leftJson.value)
-          leftJson.value = formatJson(leftJson.value, 2, false)
+        if (leftContent.trim()) {
+          JSON.parse(leftContent)
+          leftJson.value = formatJson(leftContent, 2, false)
         }
       } catch (error) {
         leftValid = false
       }
 
       try {
-        if (rightJson.value.trim()) {
-          JSON.parse(rightJson.value)
-          rightJson.value = formatJson(rightJson.value, 2, false)
+        if (rightContent.trim()) {
+          JSON.parse(rightContent)
+          rightJson.value = formatJson(rightContent, 2, false)
         }
       } catch (error) {
         rightValid = false
@@ -185,25 +196,90 @@ export function useJsonComparison() {
     }
   }
 
+  // 从对齐内容中提取原始 JSON（去掉占位符行）
+  // 用于 formatBoth/sortBoth 直接从编辑器内容中提取
+  const extractJsonFromAligned = (editorContent, alignedContent, types, side) => {
+    if (!types || types.length === 0) {
+      return editorContent
+    }
+
+    // 如果编辑器内容与对齐内容完全相同，按类型提取非占位符行
+    if (editorContent === alignedContent) {
+      const lines = alignedContent.split('\n')
+      const originalLines = []
+      for (let i = 0; i < lines.length; i++) {
+        const type = types[i]
+        const isPlaceholder =
+          (type === 'added' && side === 'left') ||
+          (type === 'removed' && side === 'right')
+        if (!isPlaceholder) {
+          if (type === 'equal' || lines[i].trim() !== '') {
+            originalLines.push(lines[i])
+          }
+        }
+      }
+      return originalLines.length > 0 ? originalLines.join('\n') : ''
+    }
+
+    // 编辑器内容与对齐内容不同 — 用户做了编辑
+    const editorLines = editorContent.split('\n')
+
+    // 如果行数匹配 lineTypes，需要判断是否是行内编辑还是全量替换
+    if (editorLines.length === types.length) {
+      const lenDiff = Math.abs(editorContent.length - alignedContent.length)
+      const maxLen = Math.max(editorContent.length, alignedContent.length, 1)
+      // 内容长度变化超过 80%，视为全量替换（如粘贴操作）
+      if (lenDiff / maxLen > 0.8) {
+        return editorContent
+      }
+      // 否则按类型过滤占位符行
+      const filtered = []
+      for (let i = 0; i < editorLines.length; i++) {
+        const type = types[i]
+        const isPlaceholder =
+          (type === 'added' && side === 'left') ||
+          (type === 'removed' && side === 'right')
+        if (!isPlaceholder) {
+          filtered.push(editorLines[i])
+        }
+      }
+      return filtered.join('\n')
+    }
+
+    // 行数不匹配，直接返回编辑器内容（全量替换）
+    return editorContent
+  }
+
   // 排序两边 (按键名字母排序)
-  const sortBoth = () => {
+  const sortBoth = (rawLeftContent, rawRightContent) => {
     try {
+      // 如果提供了原始编辑器内容，优先使用
+      let leftContent = leftJson.value
+      let rightContent = rightJson.value
+
+      if (rawLeftContent !== undefined && rawLeftContent !== null) {
+        leftContent = extractJsonFromAligned(rawLeftContent, alignedLeft.value, lineTypes.value, 'left')
+      }
+      if (rawRightContent !== undefined && rawRightContent !== null) {
+        rightContent = extractJsonFromAligned(rawRightContent, alignedRight.value, lineTypes.value, 'right')
+      }
+
       // 只有在JSON有效时才排序
       let leftValid = true, rightValid = true
 
       try {
-        if (leftJson.value.trim()) {
-          JSON.parse(leftJson.value)
-          leftJson.value = formatJson(leftJson.value, 2, true)
+        if (leftContent.trim()) {
+          JSON.parse(leftContent)
+          leftJson.value = formatJson(leftContent, 2, true)
         }
       } catch (error) {
         leftValid = false
       }
 
       try {
-        if (rightJson.value.trim()) {
-          JSON.parse(rightJson.value)
-          rightJson.value = formatJson(rightJson.value, 2, true)
+        if (rightContent.trim()) {
+          JSON.parse(rightContent)
+          rightJson.value = formatJson(rightContent, 2, true)
         }
       } catch (error) {
         rightValid = false

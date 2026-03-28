@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(echo Rust not installed:*)",
+      "Bash(curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y 2>&1)",
+      "Bash(npm install:*)",
+      "Bash(. \"$HOME/.cargo/env\" && npx tauri icon logo.png 2>&1)",
+      "Bash(. \"$HOME/.cargo/env\" && cd /Users/guguangyi/IdeaProjects/MYJSON/src-tauri && cargo check 2>&1)",
+      "Bash(tail:*)",
+      "Bash(npm run:*)",
+      "Bash(git status:*)",
+      "Bash(cd /Users/guguangyi/IdeaProjects/MYJSON/src-tauri && cargo build --release 2>&1)",
+      "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\" && cd /Users/guguangyi/IdeaProjects/MYJSON/src-tauri && cargo build --release 2>&1)",
+      "Bash(export PATH=\"$HOME/.cargo/bin:$PATH\" && cargo build --release 2>&1)",
+      "WebSearch",
+      "mcp__MiniMax__web_search",
+      "WebFetch(domain:tool.lu)",
+      "WebFetch(domain:constantinos.dev)",
+      "Bash(~/.cargo/bin/cargo build:*)",
+      "Bash(cd /Users/guguangyi/IdeaProjects/MYJSON && export PATH=\"$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH\" && npm run tauri:build 2>&1)",
+      "Bash(/usr/bin/tail:*)"
     ]
   }
 }

@@ -8,12 +8,14 @@
       @swap="handleSwap"
       @next="handleNext"
       @prev="handlePrev"
+      @merge-to-left="handleMergeToLeft" @merge-to-right="handleMergeToRight"
       @compare-immediate="handleCompareImmediate"
       @close="$emit('close')"
     />
 
     <div class="compare-editors">
       <CompareEditor
+        ref="leftEditorRef"
         v-model="leftJson"
         :display-content="alignedLeft"
         side="left"
@@ -30,6 +32,7 @@
       <div class="compare-divider"></div>
 
       <CompareEditor
+        ref="rightEditorRef"
         v-model="rightJson"
         :display-content="alignedRight"
         side="right"
@@ -62,6 +65,7 @@ import CompareToolbar from './CompareToolbar.vue'
 import CompareEditor from './CompareEditor.vue'
 import CompareStatusBar from './CompareStatusBar.vue'
 import { useJsonComparison } from '../composables/useJsonComparison'
+import { deepMerge } from '../utils/jsonMerger'
 
 const props = defineProps({
   initialLeft: {
@@ -74,7 +78,11 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'merge'])
+
+// 编辑器组件引用
+const leftEditorRef = ref(null)
+const rightEditorRef = ref(null)
 
 // 使用比较 composable
 const {
@@ -140,11 +148,16 @@ onMounted(() => {
 
 // 事件处理
 const handleFormat = () => {
-  formatBoth()
+  // 直接从编辑器读取原始内容，避免使用可能被 extractOriginalJson 损坏的 reactive 值
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  formatBoth(rawLeft, rawRight)
 }
 
 const handleSort = () => {
-  sortBoth()
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  sortBoth(rawLeft, rawRight)
 }
 
 const handleSwap = () => {
@@ -175,10 +188,62 @@ const handleUserEditComplete = () => {
   }, 50)
 }
 
+// 合并到左侧 - 将右侧内容合并到左侧
+const handleMergeToLeft = () => {
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  
+  if (!rawLeft || !rawRight) return
+  
+  try {
+    const leftObj = JSON.parse(rawLeft)
+    const rightObj = JSON.parse(rawRight)
+    // 将右侧合并到左侧
+    const merged = deepMerge(leftObj, rightObj, { arrayStrategy: 'append' })
+    const mergedStr = JSON.stringify(merged.result, null, 2)
+    
+    // 更新左侧编辑器
+    leftEditorRef.value?.setContent(mergedStr)
+    leftJson.value = mergedStr
+    
+    // 重新比较
+    setTimeout(() => compareImmediate(), 50)
+  } catch (e) {
+    console.error('合并到左侧失败:', e)
+  }
+}
+
+// 合并到右侧 - 将左侧内容合并到右侧
+const handleMergeToRight = () => {
+  const rawLeft = leftEditorRef.value?.getRawContent()
+  const rawRight = rightEditorRef.value?.getRawContent()
+  
+  if (!rawLeft || !rawRight) return
+  
+  try {
+    const leftObj = JSON.parse(rawLeft)
+    const rightObj = JSON.parse(rawRight)
+    // 将左侧合并到右侧
+    const merged = deepMerge(rightObj, leftObj, { arrayStrategy: 'append' })
+    const mergedStr = JSON.stringify(merged.result, null, 2)
+    
+    // 更新右侧编辑器
+    rightEditorRef.value?.setContent(mergedStr)
+    rightJson.value = mergedStr
+    
+    // 重新比较
+    setTimeout(() => compareImmediate(), 50)
+  } catch (e) {
+    console.error('合并到右侧失败:', e)
+  }
+}
+
 // 暴露方法给父组件
 defineExpose({
   setInitialData,
-  compareImmediate
+  compareImmediate,
+  leftJson,
+  rightJson
 })
 </script>
 

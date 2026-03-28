@@ -672,7 +672,7 @@ function alignArrays(leftArr, rightArr, indent) {
   const rightLines = []
   const lineTypes = []
   const indentStr = '  '.repeat(indent)
-  
+
   // 开括号
   leftLines.push(`${indentStr}[`)
   rightLines.push(`${indentStr}[`)
@@ -685,21 +685,24 @@ function alignArrays(leftArr, rightArr, indent) {
   if (nArr > 200 || mArr > 200) {
     const maxLen = Math.max(nArr, mArr)
     for (let i = 0; i < maxLen; i++) {
-      const isLast = i === maxLen - 1
-      const comma = isLast ? '' : ','
+      const leftComma = (i < nArr && i < nArr - 1) ? ',' : ''
+      const rightComma = (i < mArr && i < mArr - 1) ? ',' : ''
       if (i < nArr && i < mArr) {
         const result = alignObjects(leftArr[i], rightArr[i], indent + 1)
         for (let l = 0; l < result.leftLines.length; l++) {
           const isLastLine = l === result.leftLines.length - 1
-          leftLines.push(result.leftLines[l] + (isLastLine ? comma : ''))
-          rightLines.push(result.rightLines[l] + (isLastLine ? comma : ''))
-          lineTypes.push(result.lineTypes[l])
+          const lLine = result.leftLines[l] + (isLastLine ? leftComma : '')
+          const rLine = result.rightLines[l] + (isLastLine ? rightComma : '')
+          leftLines.push(lLine)
+          rightLines.push(rLine)
+          const origType = result.lineTypes[l]
+          lineTypes.push((origType === 'equal' && lLine !== rLine) ? 'modified' : origType)
         }
       } else if (i < nArr) {
         const lines = formatValueLines(leftArr[i], indent + 1)
         for (let l = 0; l < lines.length; l++) {
           const isLastLine = l === lines.length - 1
-          leftLines.push(lines[l] + (isLastLine ? comma : ''))
+          leftLines.push(lines[l] + (isLastLine ? leftComma : ''))
           rightLines.push('')
           lineTypes.push('removed')
         }
@@ -708,7 +711,7 @@ function alignArrays(leftArr, rightArr, indent) {
         for (let l = 0; l < lines.length; l++) {
           const isLastLine = l === lines.length - 1
           leftLines.push('')
-          rightLines.push(lines[l] + (isLastLine ? comma : ''))
+          rightLines.push(lines[l] + (isLastLine ? rightComma : ''))
           lineTypes.push('added')
         }
       }
@@ -722,7 +725,7 @@ function alignArrays(leftArr, rightArr, indent) {
 
   // 使用动态规划进行对齐 (类似 LCS，但考虑相似度)
   const dp = Array.from({ length: nArr + 1 }, () => new Array(mArr + 1).fill(0))
-  
+
   for (let i = 1; i <= nArr; i++) {
     for (let j = 1; j <= mArr; j++) {
       const sim = calculateSimilarity(leftArr[i-1], rightArr[j-1])
@@ -733,7 +736,7 @@ function alignArrays(leftArr, rightArr, indent) {
       }
     }
   }
-  
+
   // 回溯找出对齐路径
   const alignment = []
   let i = nArr, j = mArr
@@ -746,7 +749,7 @@ function alignArrays(leftArr, rightArr, indent) {
         continue
       }
     }
-    
+
     if (i > 0 && (j === 0 || dp[i][j] === dp[i-1][j])) {
       alignment.unshift({ leftIdx: i-1, rightIdx: null })
       i--
@@ -756,27 +759,39 @@ function alignArrays(leftArr, rightArr, indent) {
     }
   }
 
+  // Pre-compute: find the index of the last alignment entry that has a real left/right element
+  let lastLeftAlignIdx = -1
+  let lastRightAlignIdx = -1
+  for (let k = alignment.length - 1; k >= 0; k--) {
+    if (lastLeftAlignIdx === -1 && alignment[k].leftIdx !== null) lastLeftAlignIdx = k
+    if (lastRightAlignIdx === -1 && alignment[k].rightIdx !== null) lastRightAlignIdx = k
+    if (lastLeftAlignIdx !== -1 && lastRightAlignIdx !== -1) break
+  }
+
   // 根据对齐结果生成行
   for (let k = 0; k < alignment.length; k++) {
     const { leftIdx, rightIdx } = alignment[k]
-    const isLast = k === alignment.length - 1
-    const comma = isLast ? '' : ','
-    
+    const leftComma = (leftIdx !== null && k < lastLeftAlignIdx) ? ',' : ''
+    const rightComma = (rightIdx !== null && k < lastRightAlignIdx) ? ',' : ''
+
     if (leftIdx !== null && rightIdx !== null) {
       // 对齐的一对
       const result = alignObjects(leftArr[leftIdx], rightArr[rightIdx], indent + 1)
       for (let l = 0; l < result.leftLines.length; l++) {
         const isLastLine = l === result.leftLines.length - 1
-        leftLines.push(result.leftLines[l] + (isLastLine ? comma : ''))
-        rightLines.push(result.rightLines[l] + (isLastLine ? comma : ''))
-        lineTypes.push(result.lineTypes[l])
+        const lLine = result.leftLines[l] + (isLastLine ? leftComma : '')
+        const rLine = result.rightLines[l] + (isLastLine ? rightComma : '')
+        leftLines.push(lLine)
+        rightLines.push(rLine)
+        const origType = result.lineTypes[l]
+        lineTypes.push((origType === 'equal' && lLine !== rLine) ? 'modified' : origType)
       }
     } else if (leftIdx !== null) {
       // 只有左侧
       const lines = formatValueLines(leftArr[leftIdx], indent + 1)
       for (let l = 0; l < lines.length; l++) {
         const isLastLine = l === lines.length - 1
-        leftLines.push(lines[l] + (isLastLine ? comma : ''))
+        leftLines.push(lines[l] + (isLastLine ? leftComma : ''))
         rightLines.push('')
         lineTypes.push('removed')
       }
@@ -786,7 +801,7 @@ function alignArrays(leftArr, rightArr, indent) {
       for (let l = 0; l < lines.length; l++) {
         const isLastLine = l === lines.length - 1
         leftLines.push('')
-        rightLines.push(lines[l] + (isLastLine ? comma : ''))
+        rightLines.push(lines[l] + (isLastLine ? rightComma : ''))
         lineTypes.push('added')
       }
     }
@@ -817,94 +832,199 @@ function alignObjectProps(leftObj, rightObj, indent) {
 
   const leftKeys = Object.keys(leftObj)
   const rightKeys = Object.keys(rightObj)
-  const allKeys = [...new Set([...leftKeys, ...rightKeys])]
 
-  // 按左侧顺序排列，新增的键放在后面
-  allKeys.sort((a, b) => {
-    const aInLeft = leftKeys.includes(a)
-    const bInLeft = leftKeys.includes(b)
-    if (aInLeft && bInLeft) return leftKeys.indexOf(a) - leftKeys.indexOf(b)
-    if (aInLeft) return -1
-    if (bInLeft) return 1
-    return rightKeys.indexOf(a) - rightKeys.indexOf(b)
-  })
+  // Use LCS-like alignment on the key sequences to preserve both sides' original ordering.
+  // Keys present on both sides are aligned; keys only on one side are inserted as added/removed.
+  const commonLeft = leftKeys.filter(k => k in rightObj)
+  const commonRight = rightKeys.filter(k => k in leftObj)
 
-  for (let i = 0; i < allKeys.length; i++) {
-    const key = allKeys[i]
-    const hasLeft = key in leftObj
-    const hasRight = key in rightObj
-    const isLast = i === allKeys.length - 1
-    const comma = isLast ? '' : ','
+  // Build LCS of common keys (by key name equality) to find optimal alignment
+  const n = commonLeft.length
+  const m = commonRight.length
+  const dp = Array.from({ length: n + 1 }, () => new Array(m + 1).fill(0))
+  for (let i = 1; i <= n; i++) {
+    for (let j = 1; j <= m; j++) {
+      if (commonLeft[i-1] === commonRight[j-1]) {
+        dp[i][j] = dp[i-1][j-1] + 1
+      } else {
+        dp[i][j] = Math.max(dp[i-1][j], dp[i][j-1])
+      }
+    }
+  }
+
+  // Backtrack to get the ordered list of matched common keys
+  const matchedKeys = []
+  let ci = n, cj = m
+  while (ci > 0 && cj > 0) {
+    if (commonLeft[ci-1] === commonRight[cj-1]) {
+      matchedKeys.unshift(commonLeft[ci-1])
+      ci--; cj--
+    } else if (dp[ci-1][cj] >= dp[ci][cj-1]) {
+      ci--
+    } else {
+      cj--
+    }
+  }
+  const matchedSet = new Set(matchedKeys)
+
+  // Now build the alignment sequence:
+  // Walk through both sides, interleaving matched keys with side-only keys.
+  // For matched keys: output in matched order.
+  // For left-only keys: insert at the position they appear relative to the matched keys.
+  // For right-only keys: insert at the position they appear relative to the matched keys.
+  // For common-but-unmatched keys (reordered): they go as removed on left + added on right.
+
+  const sequence = [] // { key, onLeft, onRight }
+
+  let leftPtr = 0
+  let rightPtr = 0
+  let matchPtr = 0
+
+  while (matchPtr < matchedKeys.length) {
+    const mk = matchedKeys[matchPtr]
+
+    // Emit left-side keys before this matched key
+    while (leftPtr < leftKeys.length && leftKeys[leftPtr] !== mk) {
+      const k = leftKeys[leftPtr]
+      if (k in rightObj && !matchedSet.has(k)) {
+        // Common but reordered key - appears on left before its right-side position
+        // Emit as left-only (removed) here; it will appear as right-only (added) later
+        sequence.push({ key: k, onLeft: true, onRight: false })
+      } else if (!(k in rightObj)) {
+        sequence.push({ key: k, onLeft: true, onRight: false })
+      }
+      leftPtr++
+    }
+
+    // Emit right-side keys before this matched key
+    while (rightPtr < rightKeys.length && rightKeys[rightPtr] !== mk) {
+      const k = rightKeys[rightPtr]
+      if (k in leftObj && !matchedSet.has(k)) {
+        // Common but reordered key - appears on right before its left-side position
+        sequence.push({ key: k, onLeft: false, onRight: true })
+      } else if (!(k in leftObj)) {
+        sequence.push({ key: k, onLeft: false, onRight: true })
+      }
+      rightPtr++
+    }
+
+    // Emit the matched key
+    sequence.push({ key: mk, onLeft: true, onRight: true })
+    leftPtr++
+    rightPtr++
+    matchPtr++
+  }
+
+  // Emit remaining left keys
+  while (leftPtr < leftKeys.length) {
+    const k = leftKeys[leftPtr]
+    if (k in rightObj && !matchedSet.has(k)) {
+      sequence.push({ key: k, onLeft: true, onRight: false })
+    } else if (!(k in rightObj)) {
+      sequence.push({ key: k, onLeft: true, onRight: false })
+    }
+    leftPtr++
+  }
+
+  // Emit remaining right keys
+  while (rightPtr < rightKeys.length) {
+    const k = rightKeys[rightPtr]
+    if (k in leftObj && !matchedSet.has(k)) {
+      sequence.push({ key: k, onLeft: false, onRight: true })
+    } else if (!(k in leftObj)) {
+      sequence.push({ key: k, onLeft: false, onRight: true })
+    }
+    rightPtr++
+  }
+
+  // Pre-compute last real index for each side for comma calculation
+  let lastLeftSeqIdx = -1
+  let lastRightSeqIdx = -1
+  for (let i = sequence.length - 1; i >= 0; i--) {
+    if (lastLeftSeqIdx === -1 && sequence[i].onLeft) lastLeftSeqIdx = i
+    if (lastRightSeqIdx === -1 && sequence[i].onRight) lastRightSeqIdx = i
+    if (lastLeftSeqIdx !== -1 && lastRightSeqIdx !== -1) break
+  }
+
+  for (let i = 0; i < sequence.length; i++) {
+    const { key, onLeft, onRight } = sequence[i]
     const keyStr = `"${key}": `
 
+    const leftComma = (onLeft && i < lastLeftSeqIdx) ? ',' : ''
+    const rightComma = (onRight && i < lastRightSeqIdx) ? ',' : ''
 
-    if (hasLeft && hasRight) {
+    if (onLeft && onRight) {
       // 两侧都有
       const leftVal = leftObj[key]
       const rightVal = rightObj[key]
-      
+
       if (typeof leftVal === 'object' && leftVal !== null &&
           typeof rightVal === 'object' && rightVal !== null) {
         // 嵌套对象/数组
         const result = alignObjects(leftVal, rightVal, indent + 1)
-        
+
         // 第一行加上key
         const firstLeft = result.leftLines[0].trim()
         const firstRight = result.rightLines[0].trim()
         leftLines.push(`${innerIndent}${keyStr}${firstLeft}`)
         rightLines.push(`${innerIndent}${keyStr}${firstRight}`)
         lineTypes.push(result.lineTypes[0])
-        
+
         // 其余行
         for (let j = 1; j < result.leftLines.length; j++) {
           const isLastLine = j === result.leftLines.length - 1
-          leftLines.push(result.leftLines[j] + (isLastLine ? comma : ''))
-          rightLines.push(result.rightLines[j] + (isLastLine ? comma : ''))
-          lineTypes.push(result.lineTypes[j])
+          const lLine = result.leftLines[j] + (isLastLine ? leftComma : '')
+          const rLine = result.rightLines[j] + (isLastLine ? rightComma : '')
+          leftLines.push(lLine)
+          rightLines.push(rLine)
+          const origType = result.lineTypes[j]
+          lineTypes.push((origType === 'equal' && lLine !== rLine) ? 'modified' : origType)
         }
       } else {
         // 简单值
         const leftValStr = formatSimpleValue(leftVal)
         const rightValStr = formatSimpleValue(rightVal)
-        leftLines.push(`${innerIndent}${keyStr}${leftValStr}${comma}`)
-        rightLines.push(`${innerIndent}${keyStr}${rightValStr}${comma}`)
-        lineTypes.push(leftValStr === rightValStr ? 'equal' : 'modified')
+        const lLine = `${innerIndent}${keyStr}${leftValStr}${leftComma}`
+        const rLine = `${innerIndent}${keyStr}${rightValStr}${rightComma}`
+        leftLines.push(lLine)
+        rightLines.push(rLine)
+        lineTypes.push(lLine === rLine ? 'equal' : 'modified')
       }
-    } else if (hasLeft) {
+    } else if (onLeft) {
       // 只有左侧 (删除) - 右侧使用虚拟占位行
       const lines = formatValueLines(leftObj[key], indent + 1)
       const firstLine = `${innerIndent}${keyStr}${lines[0].trim()}`
       leftLines.push(firstLine)
-      rightLines.push('') // 虚拟占位行（空行）
+      rightLines.push('')
       lineTypes.push('removed')
-      
+
       for (let j = 1; j < lines.length; j++) {
         const isLastLine = j === lines.length - 1
-        leftLines.push(lines[j] + (isLastLine ? comma : ''))
-        rightLines.push('') // 虚拟占位行（空行）
+        leftLines.push(lines[j] + (isLastLine ? leftComma : ''))
+        rightLines.push('')
         lineTypes.push('removed')
       }
       // 如果是单行，需要加逗号
       if (lines.length === 1) {
-        leftLines[leftLines.length - 1] = leftLines[leftLines.length - 1].replace(/,?$/, comma)
+        leftLines[leftLines.length - 1] = leftLines[leftLines.length - 1].replace(/,?$/, leftComma)
       }
     } else {
       // 只有右侧 (新增) - 左侧使用虚拟占位行
       const lines = formatValueLines(rightObj[key], indent + 1)
       const firstLine = `${innerIndent}${keyStr}${lines[0].trim()}`
-      leftLines.push('') // 虚拟占位行（空行）
+      leftLines.push('')
       rightLines.push(firstLine)
       lineTypes.push('added')
-      
+
       for (let j = 1; j < lines.length; j++) {
         const isLastLine = j === lines.length - 1
-        leftLines.push('') // 虚拟占位行（空行）
-        rightLines.push(lines[j] + (isLastLine ? comma : ''))
+        leftLines.push('')
+        rightLines.push(lines[j] + (isLastLine ? rightComma : ''))
         lineTypes.push('added')
       }
       // 如果是单行，需要加逗号
       if (lines.length === 1) {
-        rightLines[rightLines.length - 1] = rightLines[rightLines.length - 1].replace(/,?$/, comma)
+        rightLines[rightLines.length - 1] = rightLines[rightLines.length - 1].replace(/,?$/, rightComma)
       }
     }
   }

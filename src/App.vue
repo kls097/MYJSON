@@ -5,6 +5,22 @@
       v-if="showCompareMode"
       ref="compareViewRef"
       @close="showCompareMode = false"
+      @merge="handleMergeFromCompare"
+    />
+
+    <!-- 合并模式 -->
+    <JsonMergePanel
+      v-else-if="showMergeMode"
+      :initial-left="mergeInitialLeft"
+      :initial-right="mergeInitialRight"
+      @close="handleMergeClose"
+      @apply="handleMergeApply"
+    />
+
+    <!-- 三方合并模式 -->
+    <ThreeWayMergeView
+      v-else-if="showThreeWayMergeMode"
+      @close="showThreeWayMergeMode = false"
     />
 
     <!-- 表格视图模式 -->
@@ -28,11 +44,14 @@
         :can-redo="false"
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
+        :opened-file-path="openedFilePath"
         @format="handleFormat"
         @compress="handleCompress"
         @remove-comments="handleRemoveComments"
         @unescape="handleUnescape"
         @fix-json="handleFixJson"
+        @open-search="handleOpenSearch"
+        @save-to-file="handleSaveToFile"
         @save="handleSave"
         @toggle-history="showHistory = !showHistory"
         @toggle-query="showQueryPanel = !showQueryPanel"
@@ -44,6 +63,8 @@
         @import-excel="handleImportExcel"
         @export-excel="handleExportExcel"
         @open-compare="handleOpenCompare"
+        @open-merge="handleOpenMerge"
+        @open-three-way-merge="handleOpenThreeWayMerge"
       />
 
       <div class="main-content">
@@ -63,6 +84,7 @@
           />
           <JsonEditor
             v-if="viewMode === 'code'"
+            ref="editorRef"
             v-model="currentJson"
             @validate="handleValidation"
             @extract-to-editor="handleEditorExtract"
@@ -135,6 +157,8 @@ import HistoryPanel from './components/HistoryPanel.vue'
 import StatusBar from './components/StatusBar.vue'
 import SaveDialog from './components/SaveDialog.vue'
 import JsonCompareView from './components/JsonCompareView.vue'
+import JsonMergePanel from './components/JsonMergePanel.vue'
+import ThreeWayMergeView from './components/ThreeWayMergeView.vue'
 import TableView from './components/TableView.vue'
 import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
@@ -168,9 +192,13 @@ const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
+const showMergeMode = ref(false)
+const showThreeWayMergeMode = ref(false)
 const showTableMode = ref(false)
 const tableData = ref([])
 const compareViewRef = ref(null)
+const editorRef = ref(null)  // JsonEditor 组件引用
+const openedFilePath = ref('')  // 通过文件入口打开的文件路径
 
 // 检测是否需要修复
 const needsFixJson = computed(() => {
@@ -243,6 +271,57 @@ onMounted(() => {
               compareViewRef.value.setInitialData(payload, '')
             }
           })
+        }
+        return
+      }
+
+      // JSON 文件打开入口
+      if (code === 'json_file') {
+        if (type === 'files' && payload && payload.length > 0) {
+          const file = payload[0]
+          // 记录文件路径
+          openedFilePath.value = file.path
+          // 使用 preload.js 提供的文件读取功能
+          if (window.preloadUtils && window.preloadUtils.readFile) {
+            try {
+              const content = window.preloadUtils.readFile(file.path)
+              currentJson.value = content
+              initHistory(content)
+
+              // 自动格式化
+              nextTick(() => {
+                try {
+                  JSON.parse(content)
+                  if (format()) {
+                    pushHistory(currentJson.value)
+                  }
+                } catch (error) {
+                  console.log('File content is not valid JSON, displaying as-is')
+                }
+              })
+            } catch (error) {
+              console.error('Failed to read file:', error)
+              window.utools?.showNotification('无法读取文件: ' + error.message)
+            }
+          }
+        }
+        return
+      }
+
+      // 合并模式入口
+      if (code === 'json_merge') {
+        showMergeMode.value = true
+        if (payload && type === 'regex') {
+          // TODO: 可以传递给合并面板
+        }
+        return
+      }
+
+      // 三方合并入口
+      if (code === 'json_three_way_merge') {
+        showThreeWayMergeMode.value = true
+        if (payload && type === 'regex') {
+          // TODO: 可以传递给三方合并面板
         }
         return
       }
@@ -357,6 +436,17 @@ const handleKeydown = (event) => {
     event.preventDefault()
     handleSave()
   }
+  // Ctrl+M 打开合并视图
+  if ((event.ctrlKey || event.metaKey) && event.key === 'm') {
+    event.preventDefault()
+    if (showCompareMode.value) {
+      // 如果在比较模式，触发合并
+      handleMerge()
+    } else if (!showMergeMode.value && !showThreeWayMergeMode.value) {
+      // 打开合并视图
+      handleOpenMerge()
+    }
+  }
   // 移除 Ctrl+Z 和 Ctrl+Y 的全局拦截，让 CodeMirror 的原生撤销/重做生效
 }
 
@@ -402,6 +492,31 @@ const handleUnescape = () => {
     // 去转义成功后，尝试自动格式化
     format()
     pushHistory(currentJson.value)
+  }
+}
+
+// 打开搜索面板
+const handleOpenSearch = () => {
+  if (viewMode.value === 'code' && editorRef.value) {
+    editorRef.value.openSearch()
+  }
+}
+
+// 保存到已打开的本地文件
+const handleSaveToFile = () => {
+  if (!openedFilePath.value || !currentJson.value) return
+  if (window.preloadUtils && window.preloadUtils.writeFile) {
+    try {
+      const success = window.preloadUtils.writeFile(openedFilePath.value, currentJson.value)
+      if (success) {
+        window.utools?.showNotification('已保存到: ' + openedFilePath.value)
+      } else {
+        window.utools?.showNotification('保存失败')
+      }
+    } catch (error) {
+      console.error('Failed to save file:', error)
+      window.utools?.showNotification('保存失败: ' + error.message)
+    }
   }
 }
 
@@ -542,6 +657,56 @@ const handleOpenCompare = () => {
       compareViewRef.value.setInitialData(currentJson.value, '')
     }
   })
+}
+
+// 打开合并视图
+const handleOpenMerge = () => {
+  showMergeMode.value = true
+}
+
+// 从比较视图打开合并
+const handleMergeFromCompare = ({ left, right }) => {
+  showCompareMode.value = false
+  mergeInitialLeft.value = left
+  mergeInitialRight.value = right
+  showMergeMode.value = true
+}
+
+// 从比较视图触发合并（通过快捷键或按钮）
+const handleMerge = () => {
+  if (compareViewRef.value) {
+    // 获取原始内容
+    const rawLeft = compareViewRef.value.leftJson
+    const rawRight = compareViewRef.value.rightJson
+    handleMergeFromCompare({ left: rawLeft, right: rawRight })
+  }
+}
+
+// 合并初始数据
+const mergeInitialLeft = ref('')
+const mergeInitialRight = ref('')
+
+// 打开三方合并视图
+const handleOpenThreeWayMerge = () => {
+  showThreeWayMergeMode.value = true
+}
+
+// 关闭合并视图
+const handleMergeClose = () => {
+  showMergeMode.value = false
+  mergeInitialLeft.value = ''
+  mergeInitialRight.value = ''
+}
+
+// 应用合并结果到编辑器
+const handleMergeApply = (result) => {
+  if (result) {
+    pushHistory(currentJson.value)
+    currentJson.value = result
+    pushHistory(result)
+    validate()
+  }
+  handleMergeClose()
 }
 
 // 打开表格视图

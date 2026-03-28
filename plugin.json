@@ -19,8 +19,22 @@
       "code": "json_editor",
       "explain": "格式化、验证、压缩、查询JSON",
       "icon": "logo.png",
-      "cmds": ["JSON", "json", "JSON编辑器", "JSON工具", "JSON格式化"],
+      "cmds": ["JSON", "json", "JSON编辑器", "JSON��具", "JSON格式化"],
       "mainPush": true
+    },
+    {
+      "code": "json_file",
+      "explain": "打开文件并作为JSON处理",
+      "icon": "logo.png",
+      "cmds": [
+        {
+          "type": "files",
+          "label": "用JSON工具打开",
+          "fileType": "file",
+          "minLength": 1,
+          "maxLength": 1
+        }
+      ]
     },
     {
       "code": "json_format",
@@ -42,6 +56,18 @@
       "explain": "比较两个JSON的结构差异",
       "icon": "logo.png",
       "cmds": ["JSON比较", "compare json", "JSON对比", "json diff"]
+    },
+    {
+      "code": "json_merge",
+      "explain": "智能合并两个JSON对象，支持多种合并策略",
+      "icon": "logo.png",
+      "cmds": ["JSON合并", "merge json", "json merge", "智能合并"]
+    },
+    {
+      "code": "json_three_way_merge",
+      "explain": "三方合并：基础版本、左侧版本、右侧版本",
+      "icon": "logo.png",
+      "cmds": ["三方合并", "three way merge", "3方合并"]
     },
     {
       "code": "json_convert",
