@@ -592,6 +592,9 @@ const closeContextMenu = () => {
   }
 }
 
+// TODO: 大文件性能优化 — 超 100KB 的 JSON 考虑加虚拟滚动
+// CodeMirror 6 本身对大文件已有较好的渲染优化，但超深层嵌套可能需要额外处理
+
 // JSON linter for error detection
 const jsonLinter = linter(view => {
   const diagnostics = []
