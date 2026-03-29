@@ -24,6 +24,41 @@ import JSON5 from 'json5'
  * @param {string} jsonStr - ���要修复的JSON字符串
  * @returns {FixResult} 修复结果
  */
+/**
+ * 检查修复结果是否为有效的高层 JSON 类型（对象或数组）
+ * 如果修复结果只是把原始内容包装成字符串等基本类型，视为降级修复
+ */
+function isDegradedFix(trimmed, parsed) {
+  if (parsed === null || typeof parsed === 'object') return false // object/array/null 都可以
+  // 原始输入不以 { 或 [ 开头，且结果不是对象/数组 → jsonrepair 把文本包成了字符串
+  const firstChar = trimmed.charAt(0)
+  if (firstChar !== '{' && firstChar !== '[') return true
+  return false
+}
+
+/**
+ * 生成修复结果对象，带降级检测
+ */
+function makeResult(parsed, fixes, level, trimmed) {
+  const fixed = JSON.stringify(parsed, null, 2)
+  if (isDegradedFix(trimmed, parsed)) {
+    return {
+      success: false,
+      fixed: trimmed,
+      fixes: [],
+      error: '内容不是 JSON 格式，无法通过自动修复使其成为有效的 JSON 对象或数组',
+      level: 0
+    }
+  }
+  return {
+    success: true,
+    fixed,
+    fixes,
+    error: null,
+    level
+  }
+}
+
 export function fixJson(jsonStr) {
   if (!jsonStr || typeof jsonStr !== 'string') {
     return {
@@ -51,13 +86,7 @@ export function fixJson(jsonStr) {
   // ========== Level 1: 标准 JSON.parse（最快，无修复）==========
   try {
     const parsed = JSON.parse(trimmed)
-    return {
-      success: true,
-      fixed: JSON.stringify(parsed, null, 2),
-      fixes: ['JSON格式正确，无需修复'],
-      error: null,
-      level: 1
-    }
+    return makeResult(parsed, ['JSON格式正确，无需修复'], 1, trimmed)
   } catch (e) {
     // 继续下一层
   }
@@ -68,13 +97,7 @@ export function fixJson(jsonStr) {
     const preProcessed = replaceSpecialValues(trimmed)
     const repaired = jsonrepair(preProcessed)
     const parsed = JSON.parse(repaired)
-    return {
-      success: true,
-      fixed: JSON.stringify(parsed, null, 2),
-      fixes: ['jsonrepair修复(专业修复库)'],
-      error: null,
-      level: 2
-    }
+    return makeResult(parsed, ['jsonrepair修复(专业修复库)'], 2, trimmed)
   } catch (e) {
     // 继续下一层
   }
@@ -82,13 +105,7 @@ export function fixJson(jsonStr) {
   // ========== Level 3: JSON5（处理JSON5格式）==========
   try {
     const parsed = JSON5.parse(trimmed)
-    return {
-      success: true,
-      fixed: JSON.stringify(parsed, null, 2),
-      fixes: ['JSON5修复(单引号/注释/尾随逗号/无引号键名)'],
-      error: null,
-      level: 3
-    }
+    return makeResult(parsed, ['JSON5修复(单引号/注释/尾随逗号/无引号键名)'], 3, trimmed)
   } catch (e) {
     // 继续下一层
   }
@@ -98,13 +115,7 @@ export function fixJson(jsonStr) {
     const preprocessed = basicPreprocess(trimmed)
     const repaired = jsonrepair(preprocessed)
     const parsed = JSON.parse(repaired)
-    return {
-      success: true,
-      fixed: JSON.stringify(parsed, null, 2),
-      fixes: ['基础预处理', 'jsonrepair修复'],
-      error: null,
-      level: 4
-    }
+    return makeResult(parsed, ['基础预处理', 'jsonrepair修复'], 4, trimmed)
   } catch (e) {
     // 继续下一层
   }
@@ -113,13 +124,7 @@ export function fixJson(jsonStr) {
   try {
     const preprocessed = basicPreprocess(trimmed)
     const parsed = JSON5.parse(preprocessed)
-    return {
-      success: true,
-      fixed: JSON.stringify(parsed, null, 2),
-      fixes: ['基础预处理', 'JSON5解析'],
-      error: null,
-      level: 5
-    }
+    return makeResult(parsed, ['基础预处理', 'JSON5解析'], 5, trimmed)
   } catch (e) {
     // 继续下一层
   }
@@ -132,23 +137,11 @@ export function fixJson(jsonStr) {
     try {
       const repaired = jsonrepair(aggressive)
       const parsed = JSON.parse(repaired)
-      return {
-        success: true,
-        fixed: JSON.stringify(parsed, null, 2),
-        fixes: ['深度预处理', 'jsonrepair修复'],
-        error: null,
-        level: 6
-      }
+      return makeResult(parsed, ['深度预处理', 'jsonrepair修复'], 6, trimmed)
     } catch (e) {
       // 尝试 JSON5
       const parsed = JSON5.parse(aggressive)
-      return {
-        success: true,
-        fixed: JSON.stringify(parsed, null, 2),
-        fixes: ['深度预处理', 'JSON5解析'],
-        error: null,
-        level: 6
-      }
+      return makeResult(parsed, ['深度预处理', 'JSON5解析'], 6, trimmed)
     }
   } catch (e) {
     // 所有策略都失败

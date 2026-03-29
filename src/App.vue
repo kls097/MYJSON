@@ -726,9 +726,16 @@ const handleFixJson = () => {
 
     const fixSummary = friendlyFixes.join('、')
 
+    // 预格式化修复结果，避免 format() 产生第二次 dispatch 导致 CodeMirror 撤销历史断裂
+    let formattedFixed = result.fixed
+    try {
+      formattedFixed = JSON.stringify(JSON.parse(result.fixed), null, 2)
+    } catch (e) {
+      // 如果结果无法再次解析，直接使用
+    }
+
     pushHistory(oldContent)
-    currentJson.value = result.fixed
-    format()
+    currentJson.value = formattedFixed
     pushHistory(currentJson.value)
     validate()
 
@@ -740,7 +747,11 @@ const handleFixJson = () => {
       action: {
         text: '撤销',
         onClick: () => {
-          undo()
+          const prev = undo()
+          if (prev !== null) {
+            currentJson.value = prev
+            validate()
+          }
         },
         autoClose: true
       }
