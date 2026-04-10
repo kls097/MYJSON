@@ -14,11 +14,13 @@
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "jmespath": "^0.16.0",
+    "js-yaml": "^4.1.1",
     "json-schema-faker": "^0.5.3",
     "json5": "^2.2.3",
     "jsonpath-plus": "^10.3.0",
     "jsonrepair": "^3.13.1",
     "quicktype-core": "^23.2.6",
+    "smol-toml": "^1.6.1",
     "vue": "^3.5.24",
     "xlsx": "^0.18.5"
   },

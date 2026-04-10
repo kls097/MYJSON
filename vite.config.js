@@ -15,7 +15,8 @@ export default defineConfig({
           'vendor': ['vue'],
           'json-tools': ['jsonpath-plus', 'jmespath', 'json5', 'jsonrepair'],
           'excel': ['xlsx'],
-          'quicktype': ['quicktype-core']
+          'quicktype': ['quicktype-core'],
+          'yaml-toml': ['js-yaml', 'smol-toml']
         }
       }
     }

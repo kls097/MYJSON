@@ -169,6 +169,14 @@
             <span class="dropdown-item-icon">🔃</span>
             三方合并
           </button>
+          <button class="dropdown-item" @click="handleDropdownAction('toggle-format-convert')">
+            <span class="dropdown-item-icon">🔄</span>
+            格式转换
+          </button>
+          <button class="dropdown-item" @click="handleDropdownAction('toggle-data-masker')">
+            <span class="dropdown-item-icon">🔒</span>
+            数据脱敏
+          </button>
           <button class="dropdown-item" @click="handleDropdownAction('remove-comments')" :disabled="!hasContent">
             <span class="dropdown-item-icon">🗑️</span>
             移除注释
@@ -271,7 +279,9 @@ const emit = defineEmits([
   'open-merge',
   'open-three-way-merge',
   'compare-last-snapshot',
-  'toggle-bookmark'
+  'toggle-bookmark',
+  'toggle-format-convert',
+  'toggle-data-masker'
 ])
 
 const showDropdown = ref(false)

@@ -71,6 +71,8 @@
         @toggle-convert="showConvertPanel = !showConvertPanel"
         @toggle-schema="showSchemaPanel = !showSchemaPanel"
         @toggle-bookmark="showBookmarkPanel = !showBookmarkPanel"
+        @toggle-format-convert="showFormatConvertPanel = !showFormatConvertPanel"
+        @toggle-data-masker="showDataMaskerPanel = !showDataMaskerPanel"
         @change-view="handleViewChange"
         @import-json="handleImportJson"
         @save-to-local="handleSaveToLocal"
@@ -90,6 +92,12 @@
             @query-result="handleQueryResult"
             @query-error="handleQueryError"
             @query-clear="handleQueryClear"
+          />
+          <FormatConvertPanel
+            v-if="showFormatConvertPanel"
+            @close="showFormatConvertPanel = false"
+            @convert-result="handleFormatConvertResult"
+            @convert-error="handleFormatConvertError"
           />
           <JsonConvertPanel
             v-if="showConvertPanel"
@@ -153,6 +161,11 @@
         @load="handleLoadBookmark"
         @remove="removeBookmark"
       />
+      <DataMaskerPanel
+        v-if="showDataMaskerPanel"
+        @close="showDataMaskerPanel = false"
+        @apply="handleDataMaskerApply"
+      />
 
       <SaveDialog
         :is-open="showSaveDialog"
@@ -196,6 +209,8 @@ import ThreeWayMergeView from './components/ThreeWayMergeView.vue'
 import TableView from './components/TableView.vue'
 import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
 import BookmarkPanel from './components/BookmarkPanel.vue'
+import FormatConvertPanel from './components/FormatConvertPanel.vue'
+import DataMaskerPanel from './components/DataMaskerPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
 import { useJsonStorage } from './composables/useJsonStorage'
 import { useClipboard } from './composables/useClipboard'
@@ -230,6 +245,8 @@ const showQueryPanel = ref(false)  // 默认隐藏查询面板
 const showConvertPanel = ref(false)  // 默认隐藏转换面板
 const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 const showBookmarkPanel = ref(false)  // 默认隐藏收藏面板
+const showFormatConvertPanel = ref(false)  // 默认隐藏格式转换面板
+const showDataMaskerPanel = ref(false)  // 默认隐藏数据脱敏面板
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
@@ -1446,9 +1463,39 @@ const handleApplyMock = (mockData) => {
  * @param {Object} error - 错误对象
  */
 const handleJumpToError = (error) => {
-  // 可以实现跳转到编辑器特定行的逻辑
-  // 目前只是简单的提示
   console.log('跳转到错误:', error)
+}
+
+// ============ 格式转换相关方法 ============
+
+const handleFormatConvertResult = ({ result, language, format, direction }) => {
+  if (direction === 'from') {
+    pushHistory(currentJson.value)
+    currentJson.value = result
+    pushHistory(result)
+    validate()
+    showFormatConvertPanel.value = false
+    showToast({ type: 'success', title: '转换完成', message: format.toUpperCase() + ' 已转为 JSON' })
+  } else {
+    convertResult.value = result
+    convertError.value = ''
+    convertLanguage.value = language
+    showToast({ type: 'success', title: '转换完成', message: 'JSON 已转为 ' + language })
+  }
+}
+
+const handleFormatConvertError = (errorMsg) => {
+  showToast({ type: 'error', title: '转换失败', message: errorMsg })
+}
+
+// ============ 数据脱敏相关方法 ============
+
+const handleDataMaskerApply = (maskedJson) => {
+  pushHistory(currentJson.value)
+  currentJson.value = maskedJson
+  pushHistory(maskedJson)
+  validate()
+  showToast({ type: 'success', title: '脱敏完成', message: '数据已脱敏处理' })
 }
 </script>
 
