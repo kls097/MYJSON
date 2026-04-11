@@ -199,7 +199,14 @@
             <button @click="saveSchema" class="btn-icon" title="保存">💾</button>
           </div>
         </div>
-        <div ref="schemaEditorRef" class="schema-editor"></div>
+        <div class="schema-editor">
+          <vue-monaco-editor
+            v-model:value="schemaInput"
+            language="json"
+            :theme="editorTheme"
+            :options="schemaEditorOptions"
+          />
+        </div>
         <div v-if="schemaParseError" class="editor-error">{{ schemaParseError }}</div>
       </div>
 
@@ -249,10 +256,25 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
-import { EditorView, basicSetup } from 'codemirror'
-import { json } from '@codemirror/lang-json'
-import { linter, lintGutter } from '@codemirror/lint'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
+
+import 'monaco-editor/esm/vs/editor/editor.api'
+import 'monaco-editor/esm/vs/language/json/monaco.contribution'
+
+const monaco = window.monaco
+loader.config({ monaco })
+
+self.MonacoEnvironment = {
+  getWorker(_, label) {
+    if (label === 'json') {
+      return new jsonWorker()
+    }
+    return new editorWorker()
+  }
+}
 
 import { useSchemaValidator } from '../composables/useSchemaValidator'
 import { generateSchema, getDefaultGenerateOptions, schemaVersionOptions, requiredFieldOptions } from '../utils/schemaGenerator'
@@ -303,8 +325,21 @@ const mockError = ref('')
 // Schema 编辑器
 const schemaInput = ref('')
 const schemaParseError = ref('')
-const schemaEditorRef = ref(null)
-let schemaEditor = null
+
+const editorTheme = 'vs'
+const schemaEditorOptions = {
+  automaticLayout: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  fontSize: 13,
+  fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace",
+  tabSize: 2,
+  quickSuggestions: false,
+  suggestOnTriggerCharacters: false,
+  wordBasedSuggestions: 'off',
+  stickyScroll: { enabled: false },
+  guides: { indentation: true, bracketPairs: true }
+}
 
 // 弹窗
 const showTemplateLibrary = ref(false)
@@ -313,70 +348,6 @@ const showSaveDialog = ref(false)
 // 选项列表
 const versionOptions = schemaVersionOptions
 const requiredOptions = requiredFieldOptions
-
-// ============ Schema 编辑器 ============
-const createSchemaEditor = () => {
-  if (!schemaEditorRef.value) return
-  
-  // 创建 JSON linter
-  const jsonLinter = linter((view) => {
-    const doc = view.state.doc.toString()
-    const errors = []
-    
-    try {
-      JSON.parse(doc)
-      schemaParseError.value = ''
-    } catch (e) {
-      const match = e.message.match(/at position (\d+)/)
-      if (match) {
-        const pos = parseInt(match[1])
-        const line = view.state.doc.lineAt(pos)
-        errors.push({
-          from: line.from,
-          to: line.to,
-          severity: 'error',
-          message: e.message
-        })
-      }
-      schemaParseError.value = e.message
-    }
-    
-    return errors
-  })
-  
-  schemaEditor = new EditorView({
-    doc: schemaInput.value,
-    extensions: [
-      basicSetup,
-      json(),
-      jsonLinter,
-      lintGutter(),
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged) {
-          schemaInput.value = update.state.doc.toString()
-        }
-      }),
-      EditorView.theme({
-        '&': { height: '300px' },
-        '.cm-scroller': { overflow: 'auto' }
-      })
-    ],
-    parent: schemaEditorRef.value
-  })
-}
-
-// 监听 schemaInput 变化，同步到编辑器
-watch(schemaInput, (newVal) => {
-  if (schemaEditor && newVal !== schemaEditor.state.doc.toString()) {
-    schemaEditor.dispatch({
-      changes: {
-        from: 0,
-        to: schemaEditor.state.doc.length,
-        insert: newVal
-      }
-    })
-  }
-})
 
 // ============ 功能方法 ============
 
@@ -555,15 +526,11 @@ const toggleFullscreen = () => {
 
 // ============ 生命周期 ============
 onMounted(() => {
-  nextTick(() => {
-    createSchemaEditor()
-  })
+  // Monaco editor is created via template, no manual init needed
 })
 
 onBeforeUnmount(() => {
-  if (schemaEditor) {
-    schemaEditor.destroy()
-  }
+  // Monaco cleanup handled by vue-monaco-editor
 })
 </script>
 
@@ -949,6 +916,11 @@ onBeforeUnmount(() => {
   border: 1px solid #ddd;
   border-radius: 4px;
   overflow: hidden;
+  height: 300px;
+}
+
+.schema-editor :deep(.monaco-editor) {
+  height: 100% !important;
 }
 
 .editor-error {

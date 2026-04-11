@@ -97,7 +97,7 @@
             @convert-error="handleConvertError"
             @convert-clear="handleConvertClear"
           />
-          <JsonEditor
+          <MonacoEditor
             v-if="viewMode === 'code'"
             ref="editorRef"
             v-model="currentJson"
@@ -181,7 +181,7 @@
 <script setup>
 import { ref, computed, provide, onMounted, onUnmounted, nextTick, reactive } from 'vue'
 import ToolbarActions from './components/ToolbarActions.vue'
-import JsonEditor from './components/JsonEditor.vue'
+import MonacoEditor from './components/MonacoEditor.vue'
 import JsonTreeView from './components/JsonTreeView.vue'
 import PathQueryPanel from './components/PathQueryPanel.vue'
 import QueryResultPanel from './components/QueryResultPanel.vue'

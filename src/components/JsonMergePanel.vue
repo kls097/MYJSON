@@ -48,7 +48,15 @@
           </div>
         </div>
         <div class="editor-container">
-          <div ref="leftEditorRef"></div>
+          <vue-monaco-editor
+            ref="leftMonacoRef"
+            v-model:value="leftContent"
+            language="json"
+            :theme="editorTheme"
+            :options="editableOptions"
+            @mount="(e) => leftEditor = e"
+            @change="onLeftChange"
+          />
         </div>
       </div>
 
@@ -60,7 +68,15 @@
           </div>
         </div>
         <div class="editor-container">
-          <div ref="rightEditorRef"></div>
+          <vue-monaco-editor
+            ref="rightMonacoRef"
+            v-model:value="rightContent"
+            language="json"
+            :theme="editorTheme"
+            :options="editableOptions"
+            @mount="(e) => rightEditor = e"
+            @change="onRightChange"
+          />
         </div>
       </div>
     </div>
@@ -102,7 +118,12 @@
         <span class="result-info">{{ resultSize }} 字符</span>
       </div>
       <div class="result-editor-container">
-        <div ref="resultEditorRef"></div>
+        <vue-monaco-editor
+          v-model:value="resultContent"
+          language="json"
+          :theme="editorTheme"
+          :options="readonlyOptions"
+        />
       </div>
       <div class="result-legend">
         <span class="legend-item"><span class="legend-color added"></span> 新增</span>
@@ -124,12 +145,26 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { EditorView, basicSetup } from 'codemirror'
-import { json } from '@codemirror/lang-json'
-import { EditorState, StateEffect, StateField } from '@codemirror/state'
-import { Decoration } from '@codemirror/view'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import { useJsonMerge } from '../composables/useJsonMerge'
+
+import 'monaco-editor/esm/vs/editor/editor.api'
+import 'monaco-editor/esm/vs/language/json/monaco.contribution'
+
+const monaco = window.monaco
+loader.config({ monaco })
+
+self.MonacoEnvironment = {
+  getWorker(_, label) {
+    if (label === 'json') {
+      return new jsonWorker()
+    }
+    return new editorWorker()
+  }
+}
 
 const props = defineProps({
   initialLeft: {
@@ -144,16 +179,36 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'apply'])
 
-const leftEditorRef = ref(null)
-const rightEditorRef = ref(null)
-const resultEditorRef = ref(null)
+const leftMonacoRef = ref(null)
+const rightMonacoRef = ref(null)
+let leftEditor = null
+let rightEditor = null
 
-let leftEditorView = null
-let rightEditorView = null
-let resultEditorView = null
-
-// 标记是否为程序化更新
+const leftContent = ref('')
+const rightContent = ref('')
+const resultContent = ref('')
 let isProgrammaticUpdate = false
+
+const editorTheme = 'vs'
+
+const editableOptions = {
+  automaticLayout: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  fontSize: 13,
+  fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace",
+  tabSize: 2,
+  quickSuggestions: false,
+  suggestOnTriggerCharacters: false,
+  wordBasedSuggestions: 'off',
+  stickyScroll: { enabled: false },
+  guides: { indentation: true, bracketPairs: true }
+}
+
+const readonlyOptions = {
+  ...editableOptions,
+  readOnly: true
+}
 
 const {
   leftJson,
@@ -175,164 +230,22 @@ const {
   setInitialData
 } = useJsonMerge()
 
-// 定义 StateEffect 用于更新装饰器
-const setDecorationsEffect = StateEffect.define()
-
-// 定义 StateField 来管理装饰器
-const decorationField = StateField.define({
-  create() {
-    return Decoration.none
-  },
-  update(decorations, tr) {
-    for (let effect of tr.effects) {
-      if (effect.is(setDecorationsEffect)) {
-        return effect.value
-      }
-    }
-    return decorations.map(tr.changes)
-  },
-  provide: f => EditorView.decorations.from(f)
-})
-
-// 创建结果编辑器装饰器
-function createResultDecorations(changeList) {
-  const decorations = []
-
-  if (!changeList || changeList.length === 0) {
-    return Decoration.none
-  }
-
-  // 将路径转换为行号并添加装饰
-  const resultContent = resultEditorView ? resultEditorView.state.doc.toString() : ''
-  const resultLines = resultContent.split('\n')
-
-  for (const change of changeList) {
-    const { path, type } = change
-    if (!path || type === 'unchanged') continue
-
-    let className = ''
-    if (type === 'added') {
-      className = 'cm-merge-added'
-    } else if (type === 'modified') {
-      className = 'cm-merge-modified'
-    } else if (type === 'unchanged') {
-      className = 'cm-merge-unchanged'
-    }
-
-    if (className) {
-      // 查找对应路径的行号
-      for (let i = 0; i < resultLines.length; i++) {
-        const line = resultLines[i]
-        // 检查该行是否包含路径中的键
-        const pathKey = path.split('.').pop()
-        if (line.includes(`"${pathKey}"`)) {
-          if (resultEditorView && i + 1 <= resultEditorView.state.doc.lines) {
-            const cmLine = resultEditorView.state.doc.line(i + 1)
-            decorations.push(
-              Decoration.line({
-                class: className
-              }).range(cmLine.from)
-            )
-          }
-          break
-        }
-      }
-    }
-  }
-
-  return Decoration.set(decorations.sort((a, b) => a.from - b.from))
+function onLeftChange(value) {
+  if (isProgrammaticUpdate) return
+  leftJson.value = value
+  validateLeft(value)
 }
 
-// 更新结果编辑器装饰器
-function updateResultDecorations() {
-  if (!resultEditorView) return
-
-  const decorations = createResultDecorations(mergeChanges.value)
-  resultEditorView.dispatch({
-    effects: setDecorationsEffect.of(decorations)
-  })
+function onRightChange(value) {
+  if (isProgrammaticUpdate) return
+  rightJson.value = value
+  validateRight(value)
 }
 
-// 初始化编辑器
-function initEditor(container, initialContent, readonly = false, onChange = null) {
-  if (!container) return null
-
-  const extensions = [
-    basicSetup,
-    json(),
-    EditorView.lineWrapping,
-    decorationField
-  ]
-
-  if (readonly) {
-    extensions.push(EditorState.readOnly.of(true))
-  } else {
-    extensions.push(EditorView.editable.of(true))
-    extensions.push(
-      EditorView.updateListener.of((update) => {
-        if (update.docChanged && onChange) {
-          if (!isProgrammaticUpdate) {
-            onChange(update.state.doc.toString())
-          }
-        }
-      })
-    )
-    // 粘贴时自动格式化
-    extensions.push(
-      EditorView.domEventHandlers({
-        paste: (event, view) => {
-          const text = event.clipboardData?.getData('text/plain')
-          if (!text) return false
-
-          try {
-            const parsed = JSON.parse(text)
-            const formatted = JSON.stringify(parsed, null, 2)
-            if (formatted !== text) {
-              event.preventDefault()
-              const { from, to } = view.state.selection.main
-              view.dispatch({
-                changes: { from, to, insert: formatted }
-              })
-              return true
-            }
-          } catch {
-            // 不是有效 JSON
-          }
-          return false
-        }
-      })
-    )
-  }
-
-  return new EditorView({
-    doc: initialContent || '',
-    extensions,
-    parent: container
-  })
-}
-
-// 初始化编辑器
 onMounted(() => {
   nextTick(() => {
-    leftEditorView = initEditor(
-      leftEditorRef.value,
-      props.initialLeft || leftJson.value,
-      false,
-      (content) => {
-        leftJson.value = content
-        validateLeft(content)
-      }
-    )
-
-    rightEditorView = initEditor(
-      rightEditorRef.value,
-      props.initialRight || rightJson.value,
-      false,
-      (content) => {
-        rightJson.value = content
-        validateRight(content)
-      }
-    )
+    leftContent.value = props.initialLeft || leftJson.value
+    rightContent.value = props.initialRight || rightJson.value
 
     if (props.initialLeft || props.initialRight) {
       setInitialData(props.initialLeft, props.initialRight)
@@ -340,36 +253,17 @@ onMounted(() => {
   })
 })
 
-onBeforeUnmount(() => {
-  if (leftEditorView) {
-    leftEditorView.destroy()
-    leftEditorView = null
-  }
-  if (rightEditorView) {
-    rightEditorView.destroy()
-    rightEditorView = null
-  }
-  if (resultEditorView) {
-    resultEditorView.destroy()
-    resultEditorView = null
-  }
-})
-
-// 格式化结果
 const formattedResult = computed(() => formatResult(true))
 const resultSize = computed(() => formattedResult.value.length)
 
-// 是否可以合并
 const canMerge = computed(() => {
   return leftJson.value.trim() && rightJson.value.trim() && isValidLeft.value && isValidRight.value
 })
 
-// 是否可以格式化
 const canFormat = computed(() => {
   return leftJson.value.trim() || rightJson.value.trim()
 })
 
-// 验证
 function validateLeft(content) {
   if (!content || !content.trim()) {
     isValidLeft.value = true
@@ -396,7 +290,6 @@ function validateRight(content) {
   }
 }
 
-// 格式化 JSON
 function formatJson(content) {
   if (!content || !content.trim()) return content
   try {
@@ -407,79 +300,37 @@ function formatJson(content) {
   }
 }
 
-// 格式化两侧
 function handleFormatBoth() {
-  const leftContent = leftEditorView ? leftEditorView.state.doc.toString() : leftJson.value
-  const rightContent = rightEditorView ? rightEditorView.state.doc.toString() : rightJson.value
-
-  const formattedLeft = formatJson(leftContent)
-  const formattedRight = formatJson(rightContent)
+  const formattedLeft = formatJson(leftContent.value)
+  const formattedRight = formatJson(rightContent.value)
 
   isProgrammaticUpdate = true
-  if (leftEditorView) {
-    leftEditorView.dispatch({
-      changes: { from: 0, to: leftEditorView.state.doc.length, insert: formattedLeft }
-    })
-  }
+  leftContent.value = formattedLeft
   leftJson.value = formattedLeft
 
-  isProgrammaticUpdate = true
-  if (rightEditorView) {
-    rightEditorView.dispatch({
-      changes: { from: 0, to: rightEditorView.state.doc.length, insert: formattedRight }
-    })
-  }
+  rightContent.value = formattedRight
   rightJson.value = formattedRight
-
   isProgrammaticUpdate = false
 }
 
-// 事件处理
 function onStrategyChange() {
   if (mergeResult.value) {
     mergeResult.value = null
     conflicts.value = []
-    // 清除结果编辑器
-    if (resultEditorView) {
-      resultEditorView.dispatch({
-        changes: { from: 0, to: resultEditorView.state.doc.length, insert: '' }
-      })
-    }
+    resultContent.value = ''
   }
 }
 
 function handleMerge() {
-  // 先从编辑器获取最新内容
-  if (leftEditorView) {
-    leftJson.value = leftEditorView.state.doc.toString()
-  }
-  if (rightEditorView) {
-    rightJson.value = rightEditorView.state.doc.toString()
-  }
+  leftJson.value = leftContent.value
+  rightJson.value = rightContent.value
 
   const result = executeMerge()
 
   if (result && result.result) {
     const formatted = formatResult(true)
-
-    // 创建结果编辑器（如果还没有）
     nextTick(() => {
-      if (!resultEditorView && resultEditorRef.value) {
-        resultEditorView = initEditor(
-          resultEditorRef.value,
-          formatted,
-          true
-        )
-      } else if (resultEditorView) {
-        isProgrammaticUpdate = true
-        resultEditorView.dispatch({
-          changes: { from: 0, to: resultEditorView.state.doc.length, insert: formatted }
-        })
-        isProgrammaticUpdate = false
-      }
-
-      // 更新装饰器
-      updateResultDecorations()
+      resultContent.value = formatted
     })
   }
 }
@@ -491,24 +342,10 @@ async function handleCopyResult() {
 
 function handleReset() {
   reset()
-
-  // 清空编辑器
   isProgrammaticUpdate = true
-  if (leftEditorView) {
-    leftEditorView.dispatch({
-      changes: { from: 0, to: leftEditorView.state.doc.length, insert: '' }
-    })
-  }
-  if (rightEditorView) {
-    rightEditorView.dispatch({
-      changes: { from: 0, to: rightEditorView.state.doc.length, insert: '' }
-    })
-  }
-  if (resultEditorView) {
-    resultEditorView.dispatch({
-      changes: { from: 0, to: resultEditorView.state.doc.length, insert: '' }
-    })
-  }
+  leftContent.value = ''
+  rightContent.value = ''
+  resultContent.value = ''
   isProgrammaticUpdate = false
 }
 
@@ -524,7 +361,6 @@ function handleClose() {
   emit('close')
 }
 
-// 工具函数
 function truncate(str, maxLen = 50) {
   if (!str) return ''
   if (str.length <= maxLen) return str
@@ -662,12 +498,8 @@ function truncate(str, maxLen = 50) {
   min-height: 150px;
 }
 
-.editor-container :deep(.cm-editor) {
-  height: 100%;
-}
-
-.editor-container :deep(.cm-scroller) {
-  overflow-y: auto;
+.editor-container :deep(.monaco-editor) {
+  height: 100% !important;
 }
 
 .conflicts-section {
@@ -772,12 +604,8 @@ function truncate(str, maxLen = 50) {
   min-height: 100px;
 }
 
-.result-editor-container :deep(.cm-editor) {
-  height: 100%;
-}
-
-.result-editor-container :deep(.cm-scroller) {
-  overflow-y: auto;
+.result-editor-container :deep(.monaco-editor) {
+  height: 100% !important;
 }
 
 .result-legend {
@@ -825,19 +653,5 @@ function truncate(str, maxLen = 50) {
   border-radius: 4px;
   color: var(--error);
   font-size: 13px;
-}
-
-/* 合并结果高亮样式 */
-:deep(.cm-merge-added) {
-  background-color: #e6ffed !important;
-}
-
-:deep(.cm-merge-modified) {
-  background-color: #ffe089 !important;
-}
-
-:deep(.cm-merge-unchanged) {
-  background-color: #f5f5f5 !important;
-  color: #999 !important;
 }
 </style>

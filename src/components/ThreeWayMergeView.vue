@@ -46,7 +46,13 @@
           <span v-if="!isValidBase" class="error-badge">JSON 错误</span>
         </div>
         <div class="editor-container">
-          <div ref="baseEditorRef"></div>
+          <vue-monaco-editor
+            v-model:value="baseContent"
+            language="json"
+            :theme="editorTheme"
+            :options="editableOptions"
+            @change="onBaseChange"
+          />
         </div>
       </div>
 
@@ -56,7 +62,13 @@
           <span v-if="!isValidLeft" class="error-badge">JSON 错误</span>
         </div>
         <div class="editor-container">
-          <div ref="leftEditorRef"></div>
+          <vue-monaco-editor
+            v-model:value="leftContent"
+            language="json"
+            :theme="editorTheme"
+            :options="editableOptions"
+            @change="onLeftChange"
+          />
         </div>
       </div>
 
@@ -66,7 +78,13 @@
           <span v-if="!isValidRight" class="error-badge">JSON 错误</span>
         </div>
         <div class="editor-container">
-          <div ref="rightEditorRef"></div>
+          <vue-monaco-editor
+            v-model:value="rightContent"
+            language="json"
+            :theme="editorTheme"
+            :options="editableOptions"
+            @change="onRightChange"
+          />
         </div>
       </div>
     </div>
@@ -114,7 +132,12 @@
         <span class="result-info">{{ resultSize }} 字符</span>
       </div>
       <div class="result-editor-container">
-        <div ref="resultEditorRef"></div>
+        <vue-monaco-editor
+          v-model:value="resultContent"
+          language="json"
+          :theme="editorTheme"
+          :options="readonlyOptions"
+        />
       </div>
     </div>
 
@@ -126,23 +149,54 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { EditorView, basicSetup } from 'codemirror'
-import { json } from '@codemirror/lang-json'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import { useJsonMerge } from '../composables/useJsonMerge'
 
-const baseEditorRef = ref(null)
-const leftEditorRef = ref(null)
-const rightEditorRef = ref(null)
-const resultEditorRef = ref(null)
+import 'monaco-editor/esm/vs/editor/editor.api'
+import 'monaco-editor/esm/vs/language/json/monaco.contribution'
 
-let baseEditorView = null
-let leftEditorView = null
-let rightEditorView = null
-let resultEditorView = null
+const monaco = window.monaco
+loader.config({ monaco })
 
-// 标记是否为程序化更新
+self.MonacoEnvironment = {
+  getWorker(_, label) {
+    if (label === 'json') {
+      return new jsonWorker()
+    }
+    return new editorWorker()
+  }
+}
+
 let isProgrammaticUpdate = false
+
+const baseContent = ref('')
+const leftContent = ref('')
+const rightContent = ref('')
+const resultContent = ref('')
+
+const editorTheme = 'vs'
+
+const editableOptions = {
+  automaticLayout: true,
+  minimap: { enabled: false },
+  scrollBeyondLastLine: false,
+  fontSize: 13,
+  fontFamily: "'Monaco', 'Menlo', 'Consolas', monospace",
+  tabSize: 2,
+  quickSuggestions: false,
+  suggestOnTriggerCharacters: false,
+  wordBasedSuggestions: 'off',
+  stickyScroll: { enabled: false },
+  guides: { indentation: true, bracketPairs: true }
+}
+
+const readonlyOptions = {
+  ...editableOptions,
+  readOnly: true
+}
 
 const {
   baseJson,
@@ -165,134 +219,43 @@ const {
   reset
 } = useJsonMerge()
 
-// 初始化编辑器
-function initEditor(container, initialContent, readonly = false, onChange = null) {
-  if (!container) return null
-
-  const extensions = [
-    basicSetup,
-    json(),
-    EditorView.lineWrapping
-  ]
-
-  if (readonly) {
-    extensions.push(EditorState.readOnly.of(true))
-  } else {
-    extensions.push(EditorView.editable.of(true))
-    if (onChange) {
-      extensions.push(
-        EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
-            if (!isProgrammaticUpdate) {
-              onChange(update.state.doc.toString())
-            }
-          }
-        })
-      )
-    }
-    // 粘贴时自动格式化
-    extensions.push(
-      EditorView.domEventHandlers({
-        paste: (event, view) => {
-          const text = event.clipboardData?.getData('text/plain')
-          if (!text) return false
-
-          try {
-            const parsed = JSON.parse(text)
-            const formatted = JSON.stringify(parsed, null, 2)
-            if (formatted !== text) {
-              event.preventDefault()
-              const { from, to } = view.state.selection.main
-              view.dispatch({
-                changes: { from, to, insert: formatted }
-              })
-              return true
-            }
-          } catch {
-            // 不是有效 JSON
-          }
-          return false
-        }
-      })
-    )
-  }
-
-  return new EditorView({
-    doc: initialContent || '',
-    extensions,
-    parent: container
-  })
+function onBaseChange(value) {
+  if (isProgrammaticUpdate) return
+  baseJson.value = value
+  validateBase(value)
 }
 
-// 初始化编辑器
+function onLeftChange(value) {
+  if (isProgrammaticUpdate) return
+  leftJson.value = value
+  validateLeft(value)
+}
+
+function onRightChange(value) {
+  if (isProgrammaticUpdate) return
+  rightJson.value = value
+  validateRight(value)
+}
+
 onMounted(() => {
   nextTick(() => {
-    baseEditorView = initEditor(
-      baseEditorRef.value,
-      baseJson.value,
-      false,
-      (content) => {
-        baseJson.value = content
-        validateBase(content)
-      }
-    )
-
-    leftEditorView = initEditor(
-      leftEditorRef.value,
-      leftJson.value,
-      false,
-      (content) => {
-        leftJson.value = content
-        validateLeft(content)
-      }
-    )
-
-    rightEditorView = initEditor(
-      rightEditorRef.value,
-      rightJson.value,
-      false,
-      (content) => {
-        rightJson.value = content
-        validateRight(content)
-      }
-    )
+    baseContent.value = baseJson.value
+    leftContent.value = leftJson.value
+    rightContent.value = rightJson.value
   })
 })
 
-onBeforeUnmount(() => {
-  if (baseEditorView) {
-    baseEditorView.destroy()
-    baseEditorView = null
-  }
-  if (leftEditorView) {
-    leftEditorView.destroy()
-    leftEditorView = null
-  }
-  if (rightEditorView) {
-    rightEditorView.destroy()
-    rightEditorView = null
-  }
-  if (resultEditorView) {
-    resultEditorView.destroy()
-    resultEditorView = null
-  }
-})
-
-// 格式化结果
 const formattedResult = computed(() => formatResult(true))
 const resultSize = computed(() => formattedResult.value.length)
 
-// 是否可以合并
 const canMerge = computed(() => {
   return baseJson.value.trim() && leftJson.value.trim() && rightJson.value.trim()
 })
 
-// 是否可以格式化
 const canFormat = computed(() => {
   return baseJson.value.trim() || leftJson.value.trim() || rightJson.value.trim()
 })
 
-// 验证
 function validateBase(content) {
   if (!content || !content.trim()) {
     isValidBase.value = true
@@ -332,7 +295,6 @@ function validateRight(content) {
   }
 }
 
-// 格式化 JSON
 function formatJson(content) {
   if (!content || !content.trim()) return content
   try {
@@ -343,75 +305,34 @@ function formatJson(content) {
   }
 }
 
-// 格式化所有编辑器
 function handleFormatAll() {
-  const baseContent = baseEditorView ? baseEditorView.state.doc.toString() : baseJson.value
-  const leftContent = leftEditorView ? leftEditorView.state.doc.toString() : leftJson.value
-  const rightContent = rightEditorView ? rightEditorView.state.doc.toString() : rightJson.value
-
-  const formattedBase = formatJson(baseContent)
-  const formattedLeft = formatJson(leftContent)
-  const formattedRight = formatJson(rightContent)
+  const formattedBase = formatJson(baseContent.value)
+  const formattedLeft = formatJson(leftContent.value)
+  const formattedRight = formatJson(rightContent.value)
 
   isProgrammaticUpdate = true
-  if (baseEditorView) {
-    baseEditorView.dispatch({
-      changes: { from: 0, to: baseEditorView.state.doc.length, insert: formattedBase }
-    })
-  }
+  baseContent.value = formattedBase
   baseJson.value = formattedBase
 
-  isProgrammaticUpdate = true
-  if (leftEditorView) {
-    leftEditorView.dispatch({
-      changes: { from: 0, to: leftEditorView.state.doc.length, insert: formattedLeft }
-    })
-  }
+  leftContent.value = formattedLeft
   leftJson.value = formattedLeft
 
-  isProgrammaticUpdate = true
-  if (rightEditorView) {
-    rightEditorView.dispatch({
-      changes: { from: 0, to: rightEditorView.state.doc.length, insert: formattedRight }
-    })
-  }
+  rightContent.value = formattedRight
   rightJson.value = formattedRight
-
   isProgrammaticUpdate = false
 }
 
-// 事件处理
 function handleMerge() {
-  // 从编辑器获取最新内容
-  if (baseEditorView) {
-    baseJson.value = baseEditorView.state.doc.toString()
-  }
-  if (leftEditorView) {
-    leftJson.value = leftEditorView.state.doc.toString()
-  }
-  if (rightEditorView) {
-    rightJson.value = rightEditorView.state.doc.toString()
-  }
+  baseJson.value = baseContent.value
+  leftJson.value = leftContent.value
+  rightJson.value = rightContent.value
 
   const result = executeThreeWayMerge()
 
   if (result && result.result) {
     const formatted = formatResult(true)
-
     nextTick(() => {
-      if (!resultEditorView && resultEditorRef.value) {
-        resultEditorView = initEditor(
-          resultEditorRef.value,
-          formatted,
-          true
-        )
-      } else if (resultEditorView) {
-        isProgrammaticUpdate = true
-        resultEditorView.dispatch({
-          changes: { from: 0, to: resultEditorView.state.doc.length, insert: formatted }
-        })
-        isProgrammaticUpdate = false
-      }
+      resultContent.value = formatted
     })
   }
 }
@@ -423,33 +344,14 @@ async function handleCopyResult() {
 
 function handleReset() {
   reset()
-
-  // 清空编辑器
   isProgrammaticUpdate = true
-  if (baseEditorView) {
-    baseEditorView.dispatch({
-      changes: { from: 0, to: baseEditorView.state.doc.length, insert: '' }
-    })
-  }
-  if (leftEditorView) {
-    leftEditorView.dispatch({
-      changes: { from: 0, to: leftEditorView.state.doc.length, insert: '' }
-    })
-  }
-  if (rightEditorView) {
-    rightEditorView.dispatch({
-      changes: { from: 0, to: rightEditorView.state.doc.length, insert: '' }
-    })
-  }
-  if (resultEditorView) {
-    resultEditorView.dispatch({
-      changes: { from: 0, to: resultEditorView.state.doc.length, insert: '' }
-    })
-  }
+  baseContent.value = ''
+  leftContent.value = ''
+  rightContent.value = ''
+  resultContent.value = ''
   isProgrammaticUpdate = false
 }
 
-// 工具函数
 function truncate(str, maxLen = 40) {
   if (!str) return ''
   if (str.length <= maxLen) return str
@@ -595,12 +497,8 @@ function truncate(str, maxLen = 40) {
   min-height: 120px;
 }
 
-.editor-container :deep(.cm-editor) {
-  height: 100%;
-}
-
-.editor-container :deep(.cm-scroller) {
-  overflow-y: auto;
+.editor-container :deep(.monaco-editor) {
+  height: 100% !important;
 }
 
 .conflicts-section {
@@ -723,12 +621,8 @@ function truncate(str, maxLen = 40) {
   min-height: 100px;
 }
 
-.result-editor-container :deep(.cm-editor) {
-  height: 100%;
-}
-
-.result-editor-container :deep(.cm-scroller) {
-  overflow-y: auto;
+.result-editor-container :deep(.monaco-editor) {
+  height: 100% !important;
 }
 
 .error-message {
