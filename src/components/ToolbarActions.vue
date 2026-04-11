@@ -24,6 +24,13 @@
           </button>
           <button
             class="dropdown-item"
+            @click="handleViewChange('graph')"
+          >
+            <span class="dropdown-item-icon">🗺️</span>
+            图谱视图
+          </button>
+          <button
+            class="dropdown-item"
             @click="handleViewChange('table')"
             :disabled="!canOpenTable"
           >
@@ -282,6 +289,7 @@ const viewModeLabel = computed(() => {
   switch (props.viewMode) {
     case 'code': return '代码'
     case 'tree': return '树形'
+    case 'graph': return '图谱'
     case 'table': return '表格'
     default: return '视图'
   }

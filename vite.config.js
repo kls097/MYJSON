@@ -14,13 +14,21 @@ export default defineConfig({
           'monaco-editor': ['monaco-editor'],
           'json-tools': ['jsonpath-plus', 'jmespath', 'json5', 'jsonrepair'],
           'excel': ['xlsx'],
-          'quicktype': ['quicktype-core']
+          'quicktype': ['quicktype-core'],
+          'jsoncrack': ['react', 'react-dom', 'jsoncrack-react', 'reaflow']
         }
       }
     }
   },
   optimizeDeps: {
-    include: ['quicktype-core'],
+    include: [
+      'quicktype-core',
+      'jsoncrack-react',
+      'react',
+      'react-dom',
+      'react-dom/client',
+      'human-format'
+    ],
     exclude: []
   },
   server: {

@@ -105,6 +105,12 @@
             @extract-to-editor="handleEditorExtract"
             @extract-path="handleExtractPath"
           />
+          <JsonGraphView
+            v-else-if="viewMode === 'graph'"
+            :json="graphInputData"
+            @node-click="handleGraphNodeClick"
+            @extract-path="handleExtractPath"
+          />
           <JsonTreeView
             v-else
             :data="parsedJson"
@@ -183,6 +189,7 @@ import { ref, computed, provide, onMounted, onUnmounted, nextTick, reactive } fr
 import ToolbarActions from './components/ToolbarActions.vue'
 import MonacoEditor from './components/MonacoEditor.vue'
 import JsonTreeView from './components/JsonTreeView.vue'
+import JsonGraphView from './components/JsonGraphView.vue'
 import PathQueryPanel from './components/PathQueryPanel.vue'
 import QueryResultPanel from './components/QueryResultPanel.vue'
 import JsonConvertPanel from './components/JsonConvertPanel.vue'
@@ -230,7 +237,7 @@ const showQueryPanel = ref(false)  // 默认隐藏查询面板
 const showConvertPanel = ref(false)  // 默认隐藏转换面板
 const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 const showBookmarkPanel = ref(false)  // 默认隐藏收藏面板
-const viewMode = ref('code')  // 视图模式: 'code' 或 'tree'
+const viewMode = ref('code')  // 视图模式: 'code' 或 'tree' 或 'graph'
 const activeFeature = ref('')
 const showCompareMode = ref(false)
 const showMergeMode = ref(false)
@@ -1041,6 +1048,28 @@ const handleViewChange = (mode) => {
   } else {
     viewMode.value = mode
   }
+}
+
+// 图谱视图输入数据：优先用已解析的 JSON，否则用原始字符串
+const graphInputData = computed(() => {
+  if (parsedJson.value !== null) {
+    return parsedJson.value
+  }
+  // 尝试解析当前 JSON 字符串
+  if (currentJson.value) {
+    try {
+      return JSON.parse(currentJson.value)
+    } catch {
+      return currentJson.value
+    }
+  }
+  return null
+})
+
+// 处理图谱节点点击 → 切换到代码视图并定位
+const handleGraphNodeClick = (node) => {
+  // 先切换到代码视图
+  viewMode.value = 'code'
 }
 
 const handleToggleView = () => {
