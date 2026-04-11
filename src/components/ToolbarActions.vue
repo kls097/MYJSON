@@ -33,6 +33,9 @@
           </button>
         </div>
       </div>
+      <button class="btn btn-sm btn-secondary" @click="$emit('open-compare')" title="比较视图">
+        比较
+      </button>
       <!-- 保存到本地文件按钮 - 仅在通过文件入口打开时显示 -->
       <button
         v-if="openedFilePath"
@@ -156,10 +159,6 @@
           <button class="dropdown-item" @click="handleDropdownAction('toggle-schema')">
             <span class="dropdown-item-icon">📝</span>
             Schema 验证
-          </button>
-          <button class="dropdown-item" @click="handleDropdownAction('open-compare')">
-            <span class="dropdown-item-icon">⚖️</span>
-            比较视图
           </button>
           <button class="dropdown-item" @click="handleDropdownAction('open-merge')">
             <span class="dropdown-item-icon">🔀</span>
