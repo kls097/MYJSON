@@ -901,6 +901,14 @@ export function needsFix(jsonStr) {
   const trimmed = jsonStr.trim()
   if (!trimmed) return { needs: false, hint: '' }
 
+  // 优先尝试标准解析，合法 JSON 无需修复
+  try {
+    JSON.parse(trimmed)
+    return { needs: false, hint: '' }
+  } catch (_) {
+    // 解析失败，继续下面的快速检查
+  }
+
   // 快速检查常见问题，给出精确提示
   if (/,\s*[}\]]/.test(trimmed)) {
     return { needs: true, hint: '检测到尾随逗号' }
@@ -911,10 +919,10 @@ export function needsFix(jsonStr) {
   if (/^\s*(True|False|None)\b/.test(trimmed)) {
     return { needs: true, hint: '检测到 Python 风格字面量' }
   }
-  if (/NaN|Infinity|undefined/.test(trimmed) && !/["'].*NaN/.test(trimmed)) {
+  if (/NaN|Infinity|undefined/.test(stripStrings(trimmed))) {
     return { needs: true, hint: '检测到非法 JSON 值 (NaN/Infinity/undefined)' }
   }
-  if (/\/\//.test(trimmed) || /\/\*/.test(trimmed)) {
+  if (/\/\//.test(stripStrings(trimmed)) || /\/\*/.test(stripStrings(trimmed))) {
     return { needs: true, hint: '检测到注释' }
   }
   if (/{\s*,|\[\s*,/.test(trimmed)) {
@@ -924,14 +932,5 @@ export function needsFix(jsonStr) {
     return { needs: true, hint: '检测到 MongoDB 类型' }
   }
 
-  try {
-    JSON.parse(trimmed)
-    return { needs: false, hint: '' }
-  } catch (e) {
-    const msg = e.message || ''
-    if (msg.includes('position')) {
-      return { needs: true, hint: `JSON 解析错误: ${msg}` }
-    }
-    return { needs: true, hint: 'JSON 格式有误' }
-  }
+  return { needs: true, hint: 'JSON 格式有误' }
 }

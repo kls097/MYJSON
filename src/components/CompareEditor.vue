@@ -22,6 +22,7 @@ import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
+import '../monaco-locale-init.js'
 
 import 'monaco-editor/esm/vs/editor/editor.api'
 import 'monaco-editor/esm/vs/language/json/monaco.contribution'

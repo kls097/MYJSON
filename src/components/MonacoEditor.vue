@@ -11,62 +11,16 @@
         @change="handleChange"
       />
     </div>
-
-    <!-- 右键菜单 -->
-    <div
-      v-if="showContextMenu"
-      class="context-menu"
-      :style="{ left: contextMenuPos.x + 'px', top: contextMenuPos.y + 'px' }"
-    >
-      <button
-        class="context-menu-item"
-        :disabled="!canExtractPath"
-        @click="extractPath"
-      >
-        提取路径 ({{ currentPath || '$' }})
-      </button>
-      <button
-        class="context-menu-item"
-        :disabled="!canExtractPath"
-        @click="extractPathContent"
-      >
-        提取路径内容到编辑器
-      </button>
-      <button
-        class="context-menu-item"
-        :disabled="!hasSelection"
-        @click="extractSelection"
-      >
-        提取选中
-      </button>
-      <button
-        class="context-menu-item"
-        :disabled="!hasSelection"
-        @click="formatSelection"
-      >
-        格式化选中
-      </button>
-      <button class="context-menu-item" @click="copySelection">
-        复制{{ hasSelection ? '' : '全部' }}
-      </button>
-      <div v-if="currentPath && currentPath !== '$'" class="context-menu-divider"></div>
-      <button
-        v-if="currentPath && currentPath !== '$'"
-        class="context-menu-item"
-        @click="copyJsonPath"
-      >
-        复制 JSONPath
-      </button>
-    </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { ref, watch, onBeforeUnmount, nextTick } from 'vue'
 import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import { useClipboard } from '../composables/useClipboard'
+import '../monaco-locale-init.js'
 
 import 'monaco-editor/esm/vs/editor/editor.api'
 import 'monaco-editor/esm/vs/language/json/monaco.contribution'
@@ -98,12 +52,6 @@ const { copyToClipboard } = useClipboard()
 const editorContainerRef = ref(null)
 const monacoRef = ref(null)
 const content = ref(props.modelValue)
-const showContextMenu = ref(false)
-const contextMenuPos = ref({ x: 0, y: 0 })
-const selectedText = ref('')
-const hasSelection = ref(false)
-const currentPath = ref('')
-const canExtractPath = ref(false)
 let editorInstance = null
 let isProgrammaticUpdate = false
 let savedState = null
@@ -140,14 +88,119 @@ const editorOptions = {
   }
 }
 
+function getCurrentJsonPath() {
+  if (!editorInstance) return null
+  const model = editorInstance.getModel()
+  const position = editorInstance.getPosition()
+  const offset = model.getOffsetAt(position)
+  return getJsonPathAtPosition(model.getValue(), offset)
+}
+
+function registerCustomActions(editor) {
+  const actions = [
+    {
+      id: 'json-extract-path',
+      label: '提取路径',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 1,
+      run(ed) {
+        const path = getJsonPathAtPosition(ed.getModel().getValue(), ed.getModel().getOffsetAt(ed.getPosition()))
+        if (path) {
+          emit('extract-path', path)
+        }
+      }
+    },
+    {
+      id: 'json-extract-path-content',
+      label: '提取路径内容到编辑器',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 2,
+      run(ed) {
+        const path = getJsonPathAtPosition(ed.getModel().getValue(), ed.getModel().getOffsetAt(ed.getPosition()))
+        if (path) {
+          try {
+            const parsed = JSON.parse(ed.getValue())
+            const value = getValueByPath(parsed, path)
+            if (value !== undefined) {
+              emit('extract-to-editor', JSON.stringify(value, null, 2))
+            }
+          } catch (_) {}
+        }
+      }
+    },
+    {
+      id: 'json-extract-selection',
+      label: '提取选中',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 3,
+      run(ed) {
+        const selection = ed.getSelection()
+        if (selection && !selection.isEmpty()) {
+          const text = ed.getModel().getValueInRange(selection)
+          try {
+            const parsed = JSON.parse(text)
+            emit('extract-to-editor', JSON.stringify(parsed, null, 2))
+          } catch {
+            emit('extract-to-editor', text)
+          }
+        }
+      },
+      precondition: 'editorHasSelection'
+    },
+    {
+      id: 'json-format-selection',
+      label: '格式化选中',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 4,
+      run(ed) {
+        const selection = ed.getSelection()
+        if (selection && !selection.isEmpty()) {
+          const text = ed.getModel().getValueInRange(selection)
+          try {
+            const parsed = JSON.parse(text)
+            const formatted = JSON.stringify(parsed, null, 2)
+            ed.executeEdits('format-selection', [{ range: selection, text: formatted }])
+          } catch (_) {}
+        }
+      },
+      precondition: 'editorHasSelection'
+    },
+    {
+      id: 'json-copy-all',
+      label: '复制全部',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 5,
+      run(ed) {
+        copyToClipboard(ed.getValue())
+      }
+    },
+    {
+      id: 'json-copy-jsonpath',
+      label: '复制 JSONPath',
+      keybindings: [],
+      contextMenuGroupId: 'json-tools',
+      contextMenuOrder: 6,
+      run(ed) {
+        const path = getJsonPathAtPosition(ed.getModel().getValue(), ed.getModel().getOffsetAt(ed.getPosition()))
+        if (path && path !== '$') {
+          copyToClipboard(path)
+        }
+      }
+    }
+  ]
+
+  actions.forEach(action => editor.addAction(action))
+}
+
 function handleMount(editor) {
   editorInstance = editor
 
-  editor.getDomNode().addEventListener('contextmenu', (e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    handleContextMenu(e)
-  })
+  registerCustomActions(editor)
 
   editor.onDidChangeModelContent(() => {
     if (isProgrammaticUpdate) {
@@ -193,103 +246,6 @@ function validateJson(content) {
     emit('validate', { valid: true, data: parsed })
   } catch (error) {
     emit('validate', { valid: false, error: error.message })
-  }
-}
-
-// --- Context Menu Handlers ---
-
-function handleContextMenu(event) {
-  if (!editorInstance) return
-
-  const selection = editorInstance.getSelection()
-  if (selection && !selection.isEmpty()) {
-    selectedText.value = editorInstance.getModel().getValueInRange(selection)
-    hasSelection.value = true
-  } else {
-    selectedText.value = ''
-    hasSelection.value = false
-  }
-
-  const model = editorInstance.getModel()
-  const position = editorInstance.getPosition()
-  const offset = model.getOffsetAt(position)
-  const path = getJsonPathAtPosition(model.getValue(), offset)
-  currentPath.value = path || ''
-  canExtractPath.value = !!path && path !== '$'
-
-  contextMenuPos.value = { x: event.clientX, y: event.clientY }
-  showContextMenu.value = true
-}
-
-function extractSelection() {
-  if (selectedText.value) {
-    try {
-      const parsed = JSON.parse(selectedText.value)
-      emit('extract-to-editor', JSON.stringify(parsed, null, 2))
-    } catch {
-      emit('extract-to-editor', selectedText.value)
-    }
-  }
-  showContextMenu.value = false
-}
-
-function copySelection() {
-  if (selectedText.value) {
-    copyToClipboard(selectedText.value)
-  } else if (editorInstance) {
-    copyToClipboard(editorInstance.getValue())
-  }
-  showContextMenu.value = false
-}
-
-function extractPath() {
-  if (currentPath.value) {
-    emit('extract-path', currentPath.value)
-  }
-  showContextMenu.value = false
-}
-
-function extractPathContent() {
-  if (currentPath.value && editorInstance) {
-    try {
-      const parsed = JSON.parse(editorInstance.getValue())
-      const value = getValueByPath(parsed, currentPath.value)
-      if (value !== undefined) {
-        emit('extract-to-editor', JSON.stringify(value, null, 2))
-      }
-    } catch (e) {
-      console.error('Failed to extract path content:', e)
-    }
-  }
-  showContextMenu.value = false
-}
-
-function formatSelection() {
-  if (!editorInstance || !selectedText.value) return
-  try {
-    const parsed = JSON.parse(selectedText.value)
-    const formatted = JSON.stringify(parsed, null, 2)
-    const selection = editorInstance.getSelection()
-    editorInstance.executeEdits('format-selection', [{
-      range: selection,
-      text: formatted
-    }])
-  } catch {
-    // not valid JSON
-  }
-  showContextMenu.value = false
-}
-
-function copyJsonPath() {
-  if (currentPath.value) {
-    copyToClipboard(currentPath.value)
-  }
-  showContextMenu.value = false
-}
-
-function closeContextMenu() {
-  if (showContextMenu.value) {
-    showContextMenu.value = false
   }
 }
 
@@ -479,12 +435,7 @@ defineExpose({ openSearch, saveCursorState, restoreCursorState })
 
 // --- Lifecycle ---
 
-onMounted(() => {
-  document.addEventListener('click', closeContextMenu)
-})
-
 onBeforeUnmount(() => {
-  document.removeEventListener('click', closeContextMenu)
   if (editorInstance) {
     editorInstance.dispose()
     editorInstance = null
@@ -517,44 +468,5 @@ watch(() => props.modelValue, (newValue) => {
 
 .editor-container :deep(.monaco-editor) {
   height: 100% !important;
-}
-
-.context-menu {
-  position: fixed;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  z-index: 1000;
-  padding: 4px 0;
-  min-width: 180px;
-}
-
-.context-menu-item {
-  display: block;
-  width: 100%;
-  padding: 8px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text-primary);
-  cursor: pointer;
-  font-size: 13px;
-  text-align: left;
-  transition: background-color 0.2s;
-}
-
-.context-menu-item:hover:not(:disabled) {
-  background: var(--bg-secondary);
-}
-
-.context-menu-item:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.context-menu-divider {
-  height: 1px;
-  background: var(--border);
-  margin: 4px 0;
 }
 </style>
