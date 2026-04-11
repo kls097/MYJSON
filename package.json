@@ -11,6 +11,7 @@
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
+    "@guolao/vue-monaco-editor": "^1.6.0",
     "ajv": "^8.12.0",
     "ajv-formats": "^2.1.1",
     "jmespath": "^0.16.0",
@@ -18,6 +19,7 @@
     "json5": "^2.2.3",
     "jsonpath-plus": "^10.3.0",
     "jsonrepair": "^3.13.1",
+    "monaco-editor": "^0.55.1",
     "quicktype-core": "^23.2.6",
     "vue": "^3.5.24",
     "xlsx": "^0.18.5"
