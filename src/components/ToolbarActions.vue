@@ -36,7 +36,7 @@
           >
             <span class="dropdown-item-icon">📊</span>
             表格视图
-            <span v-if="!canOpenTable" class="dropdown-item-hint">(需数组)</span>
+            <span v-if="tableCandidateCount > 0" class="dropdown-item-hint">({{ tableCandidateCount }})</span>
           </button>
         </div>
       </div>
@@ -240,6 +240,10 @@ const props = defineProps({
   canOpenTable: {
     type: Boolean,
     default: false
+  },
+  tableCandidateCount: {
+    type: Number,
+    default: 0
   },
   openedFilePath: {
     type: String,

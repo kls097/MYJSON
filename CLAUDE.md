@@ -4,97 +4,90 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-这是一个 uTools 平台的 JSON 处理插件，功能包括格式化、压缩、验证、查询、比较和 Excel 转换。使用 Vue 3 + Vite 构建，运行在 uTools 桌面应用框架内。
+这是一个 uTools 平台的 JSON 处理插件，功能包括格式化、压缩、验证、查询、比较、合并、Schema 验证、表格视图和图谱可视化。使用 Vue 3 + Vite 构建，运行在 uTools 桌面应用框架内。
 
 ## 开发命令
 
-### 开发模式
 ```bash
-npm run dev
+npm run dev        # 启动 Vite 开发服务器 (localhost:5173)
+npm run build      # 构建生产版本到 dist/ 目录
+npm run pack       # 打包为 myjson-plugin.upx (uTools 安装包)
+npm test           # 运行 Node.js 测试
 ```
-启动 Vite 开发服务器，地址为 `http://localhost:5173`。在 uTools 开发者工具中添加本项目目录，插件将从开发服务器加载（配置在 `plugin.json` 的 development.main）。
 
-### 构建
-```bash
-npm run build
-```
-构建生产版本到 `dist/` 目录。此命令会：
-1. 运行 Vite 构建，进行代码分割（vendor、json-tools、excel、quicktype 等 chunks）
-2. 执行 `scripts/copy-files.js` 将 `plugin.json`、`preload.js`、`logo.png` 和字体文件复制到 `dist/`
-
-### 打包
-```bash
-npm run pack
-```
-从 `dist/` 目录创建 `myjson-plugin.upx` 文件（ZIP 压缩包），用于 uTools 安装。
+开发模式：在 uTools 开发者工具中添加本项目目录，插件从 `http://localhost:5173` 加载（配置在 `plugin.json` 的 `development.main`）。
 
 ## 架构设计
 
 ### uTools 插件结构
 
-这是一个 **uTools 插件**，不是标准的 Web 应用。关键区别：
+- **plugin.json**：定义插件元数据、功能特性（features）和入口点。每个 feature 的 `code` 决定进入哪个模式。
+- **preload.js**：Node.js 上下文脚本，通过 `window.preloadUtils` 暴露文件 I/O API。必须保持未压缩状态。
+- **index.html**：uTools 主入口点。
 
-- **plugin.json**：定义插件元数据、功能特性和入口点（cmds）。每个 feature 有一个 `code` 决定应用进入哪个模式。
-- **preload.js**：Node.js 上下文脚本，通过 `window.preloadUtils` 向渲染进程暴露原生 API（文件 I/O 操作）。根据 uTools 规范必须保持未压缩状态。
-- **index.html**：uTools 加载的主入口点，可以从开发服务器或构建文件加载。
-
-### 应用入口点
-
-应用基于 `plugin.json` 的 features 有多个入口模式：
+### 入口模式（plugin.json features）
 
 - `json_editor`：主编辑器（关键词："JSON"、"json"、"JSON编辑器"）
+- `json_file`：打开文件作为 JSON 处理
 - `json_format`：自动格式化选中的 JSON 文本（正则匹配）
 - `json_compare`：JSON 比较视图
-- `json_convert`：将 JSON 转换为代码（TypeScript、Go、Java 等）
-- `json_table`：JSON 数组的表格视图
+- `json_merge`：智能合并（多种策略）
+- `json_three_way_merge`：三方合并（base + left + right）
+- `json_table`：JSON 数组表格视图
 
 入口处理在 `App.vue:onMounted` 中通过 `window.utools.onPluginEnter()` 实现。
 
 ### Vue 3 Composition API 架构
 
-**主组件**：`src/App.vue` 协调所有功能并管理全局状态。
+**主组件**：`src/App.vue` 协调所有功能，管理全局状态和模式切换。
 
 **Composables**（可复用逻辑）：
 - `useJsonOperations`：核心 JSON 操作（格式化、压缩、验证、反转义、移除注释）
-- `useJsonStorage`：从 uTools 数据库保存/加载（`window.utools.db`）
-- `useClipboard`：通过 uTools API 进行剪贴板操作
-- `useHistory`：撤销/重做，历史栈（最多 50 条记录）
-- `useJsonPath`：JSONPath 和 JMESPath 查询执行
+- `useJsonStorage`：uTools 数据库保存/加载
+- `useClipboard`：剪贴板操作
+- `useHistory`：撤销/重做（最多 50 条记录）
+- `useJsonPath`：JSONPath 和 JMESPath 查询
 - `useJsonComparison`：JSON 差异比较
-- `useJsonConverter`：将 JSON 转换为编程语言类型（使用 quicktype-core）
+- `useJsonConverter`：JSON → 代码类型转换（quicktype-core）
+- `useJsonMerge`：两方/三方合并（deep/override 策略）
+- `useSchemaValidator`：Schema 验证、生成、Mock 数据
+- `useBookmarks`：书签/收藏管理
+- `useSnapshots`：操作快照（用于对比）
 
 **Utils**（纯函数）：
 - `jsonFormatter.js`：格式化/压缩 JSON
-- `jsonCompressor.js`：压缩，可选转义
+- `jsonCompressor.js`：压缩（可选转义）
 - `jsonValidator.js`：验证并计算统计信息
-- `jsonFixer.js`：多级 JSON 修复（6 个级别：标准解析 → jsonrepair → JSON5 → 深度预处理）
-- `jsonComparer.js`：两个 JSON 对象的结构差异
-- `jsonConverter.js`：quicktype-core 的包装器
-- `commentRemover.js`：移除 JSON5 风格的注释
-- `jsonUnescaper.js`：智能反转义已转义的 JSON 字符串
-- `excelConverter.js`：双向 JSON ↔ Excel 转换（使用 xlsx 库）
+- `jsonFixer.js`：6 级渐进式 JSON 修复
+- `jsonComparer.js`：结构差异计算
+- `jsonMerger.js`：合并策略实现
+- `jsonConverter.js`：quicktype-core 包装器
+- `jsonTableDetector.js`：智能检测可表格化的数组
+- `excelConverter.js`：双向 JSON ↔ Excel（xlsx 库）
+- `schemaValidator.js`、`schemaGenerator.js`、`mockGenerator.js`：Schema 相关
 
-**Components**（组件）：
-- `JsonEditor.vue`：带 JSON 语法检查的 CodeMirror 6 编辑器
-- `JsonTreeView.vue`：可折叠的树形可视化
-- `TableView.vue`：JSON 数组的可编辑表格
+**Components**：
+- `MonacoEditor.vue`：Monaco 编辑器（替代原 CodeMirror）
+- `JsonTreeView.vue`：可折叠树形可视化
+- `JsonGraphView.vue`：图谱可视化（jsoncrack-react）
+- `TableView.vue`：JSON 数组可编辑表格
 - `JsonCompareView.vue`：并排差异视图
-- `PathQueryPanel.vue`：JSONPath/JMESPath 查询界面
-- `JsonConvertPanel.vue`：语言选择和转换 UI
-- `HistoryPanel.vue`：已保存文档浏览器
-- `ToolbarActions.vue`：包含所有操作按钮的主工具栏
-- `StatusBar.vue`：显示验证错误和 JSON 统计信息
+- `ThreeWayMergeView.vue`：三方合并界面
+- `JsonMergePanel.vue`：两方合并界面
+- `TablePicker.vue`：多候选表格选择
+- `SchemaValidatorPanel.vue`：Schema 验证面板
+- `BookmarkPanel.vue`：收藏管理
+- `ToolbarActions.vue`：主工具栏
+- `StatusBar.vue`：状态栏
 
 ### 状态管理
 
-不使用 Vuex/Pinia。状态通过以下方式管理：
+不使用 Vuex/Pinia。状态通过：
 1. Composables 返回响应式 refs
-2. Vue `provide/inject` 用于深层组件树（例如 `currentJson`、`parsedJson`、树节点的 `expanded` map）
-3. 组件特定状态直接通过 props 传递
+2. Vue `provide/inject` 用于深层组件树（`currentJson`、`parsedJson`、`expanded`）
+3. Props 直接传递
 
 ### 文件 I/O 模式
-
-插件同时支持 uTools 环境和浏览器回退：
 
 ```javascript
 // uTools 环境（首选）
@@ -109,110 +102,78 @@ else {
 }
 ```
 
-此模式用于：
-- `handleSaveToLocal()`：保存 JSON 到本地文件
-- `handleImportJson()`：导入 JSON/TXT 文件
-- `handleImportExcel()` / `handleExportExcel()`：Excel 转换
-- `handleDownloadTableExcel()`：从表格视图导出
+### JSON 修复策略（jsonFixer.js）
 
-### 历史记录管理
-
-撤销/重做通过 `useHistory` composable 实现：
-- 维护最多 50 个内容快照的栈
-- `pushHistory(content)` 添加到栈（在操作前后调用）
-- `undo()` / `redo()` 在栈中导航
-- `isUndoRedo` 标志防止在撤销/重做操作期间记录
-- 快捷键：Ctrl+Z（撤销）、Ctrl+Y 或 Ctrl+Shift+Z（重做）
-
-### JSON 修复策略
-
-`jsonFixer.js` 实现 6 级渐进式修复：
-1. 标准 `JSON.parse()` - 已经有效
-2. `jsonrepair` 库 - 修复引号、逗号、括号
-3. JSON5 解析 - 处理单引号、注释、尾随逗号、无引号键
+6 级渐进式修复：
+1. 标准 `JSON.parse()` - 已有效
+2. `jsonrepair` 库 - 引号、逗号、括号
+3. JSON5 解析 - 单引号、注释、尾随逗号、无引号键
 4. 基础预处理 + jsonrepair
 5. JSON5 + jsonrepair
 6. 深度预处理 + JSON5 + jsonrepair
 
-每个级别依次尝试直到成功。UI 会显示哪个级别成功以及修复了什么。
-
 ## 关键技术细节
 
+### Monaco Editor 集成
+
+使用 `@guolao/vue-monaco-editor`，替代了原 CodeMirror 6：
+- 中文本地化：`monaco-locale-init.js` 设置 `globalThis._VSCODE_NLS_MESSAGES`
+- 自定义右键菜单：提取路径、提取选中、格式化选中、复制 JSONPath
+- 粘贴自动格式化：`onDidPaste` 时尝试解析并格式化
+- Worker 配置：`jsonWorker` 和 `editorWorker`
+
+### JsonGraphView（图谱可视化）
+
+使用 `jsoncrack-react` + React 19：
+- **AMD 冲突处理**：Monaco 的 AMD `define` 与 jsoncrack 的 UMD 冲突，通过 `suppressAmdDefine()` 临时移除 `window.define.amd` 解决
+- 懒加载：动态 `import('react')`、`import('jsoncrack-react')`
+- 路径提取：点击节点生成 JSONPath
+
 ### Vite 配置
-- `base: './'` 对于 uTools 本地文件加载至关重要
-- 手动分块拆分 vendor 代码以提高性能
-- 开发服务器在端口 5173，host 为 `0.0.0.0`
 
-### CodeMirror 6 集成
-`JsonEditor.vue` 使用 CodeMirror 6：
-- `@codemirror/lang-json` 用于语法高亮
-- `@codemirror/lint` 用于实时验证
-- 自定义 linter 解析 JSON 并报告带行/列的错误
+- `base: './'` - uTools 本地文件加载必需
+- 手动分块：`vendor`、`monaco-editor`、`json-tools`、`excel`、`quicktype`、`jsoncrack`
+- 开发服务器：端口 5173，host `0.0.0.0`
 
-### uTools 数据库
-通过 `window.utools.db` API 访问：
-- `put({ _id, data, _rev })`：保存/更新文档
-- `get(id)`：检索文档
-- `allDocs()`：列出所有文档
-- `remove(doc)`：删除文档
-- 通过 `window.utools.onDbPull` 支持云同步
+### uTools API
 
-### 查询引擎
-支持两种查询语法：
-- **JSONPath**：使用 `jsonpath-plus` 库（默认）
-- **JMESPath**：使用 `jmespath` 库（UI 中切换）
-
-两者都针对 `parsedJson` 执行并在 `QueryResultPanel` 中显示结果。
+常用 API（始终检查 `window.utools` 存在）：
+- `window.utools.onPluginEnter(callback)`：入口处理器
+- `window.utools.showSaveDialog/showOpenDialog(options)`：原生对话框
+- `window.utools.db.*`：数据库操作
+- `window.preloadUtils.readFile/writeFile`：文件 I/O
 
 ## 常见模式
 
 ### 添加新的 JSON 操作
 
-1. 在 `src/utils/` 中添加工具函数（纯函数）
-2. 如果可复用，集成到 `useJsonOperations` composable 中
-3. 在 `App.vue` 中添加处理器：
-   - 操作前调用 `pushHistory(currentJson.value)`
-   - 执行操作
-   - 操作后调用 `pushHistory(currentJson.value)`
-   - 调用 `validate()` 更新 UI
-4. 在 `ToolbarActions.vue` 中添加按钮并发出事件
-5. 在 `App.vue` 模板中连接事件处理器
+1. 在 `src/utils/` 添加纯函数
+2. 可选：集成到 `useJsonOperations` composable
+3. 在 `App.vue` 添加处理器（前后调用 `pushHistory`）
+4. 在 `ToolbarActions.vue` 添加按钮
+5. 连接事件处理器
 
-### 使用 uTools API
+### 添加新的视图模式
 
-始终检查 uTools 环境：
-```javascript
-if (window.utools && window.utools.someAPI) {
-  // uTools 特定代码
-} else {
-  // 浏览器回退
-}
-```
+1. 创建新组件
+2. 在 `App.vue` 添加条件渲染（`v-if="showXxxMode"`）
+3. 在 `plugin.json` 添加 feature 入口
+4. 在 `onPluginEnter` 处理对应 `code`
 
-常用 API：
-- `window.utools.onPluginEnter(callback)`：入口点处理器
-- `window.utools.showSaveDialog(options)`：原生保存对话框
-- `window.utools.showOpenDialog(options)`：原生打开对话框
-- `window.utools.db.*`：数据库操作
-- `window.preloadUtils.*`：来自 preload.js 的文件 I/O
+## 构建输出
 
-## 构建输出结构
-
-执行 `npm run build` 后：
 ```
 dist/
 ├── index.html
 ├── assets/
 │   ├── index-[hash].js
-│   ├── index-[hash].css
 │   ├── vendor-[hash].js
+│   ├── monaco-editor-[hash].js
 │   ├── json-tools-[hash].js
 │   ├── excel-[hash].js
-│   └── quicktype-[hash].js
-├── fonts/
+│   ├── quicktype-[hash].js
+│   └── jsoncrack-[hash].js
 ├── plugin.json
 ├── preload.js
 └── logo.png
 ```
-
-`pack` 脚本将其打包为 `myjson-plugin.upx`。

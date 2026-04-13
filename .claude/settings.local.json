@@ -19,7 +19,13 @@
       "WebFetch(domain:constantinos.dev)",
       "Bash(~/.cargo/bin/cargo build:*)",
       "Bash(cd /Users/guguangyi/IdeaProjects/MYJSON && export PATH=\"$HOME/.cargo/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH\" && npm run tauri:build 2>&1)",
-      "Bash(/usr/bin/tail:*)"
+      "Bash(/usr/bin/tail:*)",
+      "Bash(bash \"/Users/guguangyi/.claude/plugins/cache/omc/oh-my-claudecode/4.11.5/scripts/setup-progress.sh\" resume)",
+      "Bash(node:*)",
+      "Bash(export https_proxy=http://127.0.0.1:7890)",
+      "Bash(npm view:*)",
+      "Bash(omc --version)",
+      "Bash(claude mcp:*)"
     ]
   }
 }

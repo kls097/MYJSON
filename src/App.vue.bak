@@ -23,14 +23,6 @@
       @close="showThreeWayMergeMode = false"
     />
 
-    <!-- 表格数据源选择 -->
-    <TablePicker
-      v-if="showTablePicker"
-      :candidates="tableCandidates"
-      @select="handleTablePickerSelect"
-      @close="showTablePicker = false"
-    />
-
     <!-- 表格视图模式 -->
     <TableView
       v-else-if="showTableMode"
@@ -64,7 +56,6 @@
         :can-redo="false"
         :needs-fix="needsFixJson"
         :can-open-table="canOpenTable"
-        :table-candidate-count="tableCandidateCount"
         :opened-file-path="openedFilePath"
         :has-snapshots="hasSnapshots()"
         @format="handleFormat"
@@ -210,7 +201,6 @@ import JsonCompareView from './components/JsonCompareView.vue'
 import JsonMergePanel from './components/JsonMergePanel.vue'
 import ThreeWayMergeView from './components/ThreeWayMergeView.vue'
 import TableView from './components/TableView.vue'
-import TablePicker from './components/TablePicker.vue'
 import SchemaValidatorPanel from './components/SchemaValidatorPanel.vue'
 import BookmarkPanel from './components/BookmarkPanel.vue'
 import { useJsonOperations } from './composables/useJsonOperations'
@@ -220,7 +210,6 @@ import { useHistory } from './composables/useHistory'
 import { useSnapshots } from './composables/useSnapshots'
 import { useBookmarks } from './composables/useBookmarks'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
-import { detectTableCandidates, setValueByPath } from './utils/jsonTableDetector'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
 import ToastNotification from './components/ToastNotification.vue'
 
@@ -275,9 +264,6 @@ const showToast = (options) => {
   toast.action = options.action || null
 }
 const tableData = ref([])
-const tableCandidates = ref([])
-const tableCandidatePath = ref('')
-const showTablePicker = ref(false)
 const compareViewRef = ref(null)
 const editorRef = ref(null)  // JsonEditor 组件引用
 const openedFilePath = ref('')  // 通过文件入口打开的文件路径
@@ -339,21 +325,15 @@ const needsFixJson = computed(() => {
   return checkNeedsFix(currentJson.value).needs
 })
 
-// 检测是否可以打开表格视图（JSON有效即可，内部会智能检测数组）
+// 检测是否可以打开表格视图（JSON必须是有效数组）
 const canOpenTable = computed(() => {
   if (!currentJson.value || !currentJson.value.trim()) return false
-  try { JSON.parse(currentJson.value); return true } catch { return false }
-})
-
-// 检测到的表格候选数量（供工具栏显示）
-const tableCandidateCount = computed(() => {
-  if (!canOpenTable.value) return 0
-  return detectTableCandidates(currentJson.value).length
+  const validation = validateJsonArray(currentJson.value)
+  return validation.valid
 })
 
 // 当前视图模式（统一 viewMode 和 showTableMode）
 const currentViewMode = computed(() => {
-  if (showTablePicker.value) return 'table-picker'
   if (showTableMode.value) return 'table'
   return viewMode.value
 })
@@ -493,6 +473,28 @@ onMounted(() => {
           if (currentJson.value) {
             handleOpenTable()
           }
+        }
+        return
+      }
+
+      // 转换模式入口
+      if (code === 'json_convert') {
+        showConvertPanel.value = true
+        // 如果有 payload,设置为当前JSON
+        if (payload && type === 'regex') {
+          currentJson.value = payload
+          initHistory(payload)
+          // 自动格式化
+          nextTick(() => {
+            try {
+              JSON.parse(payload)
+              if (format()) {
+                pushHistory(currentJson.value)
+              }
+            } catch (error) {
+              console.log('Input is not valid JSON')
+            }
+          })
         }
         return
       }
@@ -889,48 +891,32 @@ const handleMergeApply = (result) => {
   handleMergeClose()
 }
 
-// 打开表格视图（智能检测数组）
+// 打开表格视图
 const handleOpenTable = () => {
   try {
-    const candidates = detectTableCandidates(currentJson.value)
+    // 验证当前 JSON 是否为数组格式
+    const validation = validateJsonArray(currentJson.value)
     
-    if (candidates.length === 0) {
-      alert('未找到可表格化的数组数据\n\n提示：需要包含至少 2 个元素的对象数组')
+    if (!validation.valid) {
+      // 显示错误和示例
+      const example = getExportExample()
+      alert(`${validation.error}\n\n${example}`)
       return
     }
     
-    if (candidates.length === 1) {
-      // 只有一个候选，直接进入表格
-      tableData.value = candidates[0].data
-      tableCandidatePath.value = candidates[0].path
-      showTableMode.value = true
-      return
-    }
-    
-    // 多个候选，展示选择面板
-    tableCandidates.value = candidates
-    showTablePicker.value = true
+    tableData.value = validation.data
+    showTableMode.value = true
   } catch (error) {
     alert(`无法打开表格视图: ${error.message}`)
   }
 }
 
-// 从选择面板确认后进入表格
-const handleTablePickerSelect = (candidate) => {
-  tableData.value = candidate.data
-  tableCandidatePath.value = candidate.path
-  showTablePicker.value = false
-  showTableMode.value = true
-}
-
-// 处理表格视图的数据修改（支持路径回写）
+// 处理表格视图的数据修改
 const handleTableApply = (newData) => {
   // 记录当前状态到历史
   pushHistory(currentJson.value)
-  // 通过路径回写到原 JSON 结构中
-  const parsed = JSON.parse(currentJson.value)
-  const updated = setValueByPath(parsed, tableCandidatePath.value, newData)
-  const newContent = JSON.stringify(updated, null, 2)
+  // 将修改后的数据格式化设置到编辑器
+  const newContent = JSON.stringify(newData, null, 2)
   currentJson.value = newContent
   // 记录新状态到历史
   pushHistory(newContent)
