@@ -242,6 +242,7 @@ const extractToEditor = () => {
   gap: 6px;
   padding: 1px 4px;
   min-height: 18px;
+  min-width: max-content;
   border-radius: 3px;
   transition: var(--transition);
 }
@@ -356,7 +357,6 @@ const extractToEditor = () => {
   cursor: pointer;
   transition: var(--transition);
   flex: 1;
-  min-width: 0;
 }
 
 .node-content:hover {
@@ -364,7 +364,7 @@ const extractToEditor = () => {
 }
 
 .node-value {
-  word-break: break-all;
+  white-space: nowrap;
 }
 
 /* 语法高亮颜色 - 保持示例图的颜色 */

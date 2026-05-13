@@ -10,6 +10,11 @@
     <!-- 字体文件存放在 public/fonts/ 目录 -->
     <!-- 如果字体文件不存在，会自动回退到系统字体 -->
     <link rel="stylesheet" href="/fonts/fonts.css">
+    <!-- 禁用 Monaco Editor 的 source map 加载 -->
+    <script>
+      // 在 Monaco 加载前设置，阻止 source map 请求
+      window.__monaco_no_sourcemaps = true;
+    </script>
   </head>
   <body>
     <div id="app"></div>

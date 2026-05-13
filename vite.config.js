@@ -28,7 +28,8 @@ export default defineConfig({
       'react',
       'react-dom',
       'react-dom/client',
-      'human-format'
+      'human-format',
+      'monaco-editor'
     ],
     exclude: []
   },

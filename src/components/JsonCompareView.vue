@@ -47,10 +47,11 @@ import CompareStatusBar from './CompareStatusBar.vue'
 import { formatJson } from '../utils/jsonFormatter'
 import '../monaco-locale-init.js'
 
-import 'monaco-editor/esm/vs/editor/editor.api'
+// 直接导入 monaco 对象，避免依赖 window.monaco
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import 'monaco-editor/esm/vs/language/json/monaco.contribution'
 
-const monaco = window.monaco
+// 配置 loader 使用导入的 monaco 实例，不从 CDN 加载
 loader.config({ monaco })
 
 self.MonacoEnvironment = {

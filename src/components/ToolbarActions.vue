@@ -140,11 +140,11 @@
       </button>
       <button
         class="btn btn-sm btn-secondary"
-        @click="$emit('toggle-bookmark')"
-        :class="{ active: showBookmark }"
-        title="收藏夹"
+        @click="$emit('save')"
+        :disabled="!hasContent"
+        title="保存 (Ctrl+S)"
       >
-        {{ showBookmark ? '隐藏收藏' : '收藏' }}
+        保存
       </button>
     </div>
 
@@ -154,11 +154,6 @@
           更多 ▾
         </button>
         <div v-if="showDropdown" class="dropdown-menu">
-          <button class="dropdown-item" @click="handleDropdownAction('save')" :disabled="!hasContent">
-            <span class="dropdown-item-icon">💾</span>
-            保存
-            <span class="dropdown-item-shortcut">Ctrl+S</span>
-          </button>
           <button class="dropdown-item" @click="handleDropdownAction('toggle-history')">
             <span class="dropdown-item-icon">📜</span>
             历史记录
@@ -252,10 +247,6 @@ const props = defineProps({
   hasSnapshots: {
     type: Boolean,
     default: false
-  },
-  showBookmark: {
-    type: Boolean,
-    default: false
   }
 })
 
@@ -280,8 +271,7 @@ const emit = defineEmits([
   'open-compare',
   'open-merge',
   'open-three-way-merge',
-  'compare-last-snapshot',
-  'toggle-bookmark'
+  'compare-last-snapshot'
 ])
 
 const showDropdown = ref(false)
