@@ -83,6 +83,27 @@ const compareError = ref('')
 const currentDiffIndex = ref(-1)
 const diffList = ref([])
 let diffEditorInstance = null
+let leftFormatTimer = null
+let rightFormatTimer = null
+const FORMAT_DEBOUNCE_MS = 500
+
+function tryFormatEditor(editor) {
+  const value = editor.getValue()
+  if (!value.trim()) return
+  try {
+    const formatted = formatJson(value, 2, false)
+    if (formatted !== value) {
+      editor.pushUndoStop()
+      editor.executeEdits('auto-format', [{
+        range: editor.getModel().getFullModelRange(),
+        text: formatted
+      }])
+      editor.pushUndoStop()
+    }
+  } catch {
+    // Not valid JSON yet
+  }
+}
 
 const editorTheme = 'vs'
 
@@ -115,11 +136,23 @@ function handleMount(editor) {
   const modifiedEditor = editor.getModifiedEditor()
   modifiedEditor.onDidChangeModelContent(() => {
     rightJson.value = modifiedEditor.getValue()
+    clearTimeout(rightFormatTimer)
+    rightFormatTimer = setTimeout(() => tryFormatEditor(modifiedEditor), FORMAT_DEBOUNCE_MS)
+  })
+  modifiedEditor.onDidPaste(() => {
+    clearTimeout(rightFormatTimer)
+    tryFormatEditor(modifiedEditor)
   })
 
   const originalEditor = editor.getOriginalEditor()
   originalEditor.onDidChangeModelContent(() => {
     leftJson.value = originalEditor.getValue()
+    clearTimeout(leftFormatTimer)
+    leftFormatTimer = setTimeout(() => tryFormatEditor(originalEditor), FORMAT_DEBOUNCE_MS)
+  })
+  originalEditor.onDidPaste(() => {
+    clearTimeout(leftFormatTimer)
+    tryFormatEditor(originalEditor)
   })
 
   editor.onDidUpdateDiff(() => {
@@ -282,6 +315,8 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(leftFormatTimer)
+  clearTimeout(rightFormatTimer)
   if (diffEditorInstance) {
     diffEditorInstance.dispose()
     diffEditorInstance = null
