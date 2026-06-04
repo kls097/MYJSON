@@ -24,10 +24,8 @@ export function useSnapshots() {
   }
 
   return {
-    snapshots,
     saveSnapshot,
     hasSnapshots,
-    getLastSnapshot,
-    clearSnapshots
+    getLastSnapshot
   }
 }

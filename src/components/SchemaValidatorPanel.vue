@@ -256,7 +256,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import { ref, watch, nextTick, computed } from 'vue'
 import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
@@ -278,7 +278,6 @@ self.MonacoEnvironment = {
   }
 }
 
-import { useSchemaValidator } from '../composables/useSchemaValidator'
 import { generateSchema, getDefaultGenerateOptions, schemaVersionOptions, requiredFieldOptions } from '../utils/schemaGenerator'
 import { generateMockData, getDefaultMockOptions, localeOptions, countOptions, generateMockPreview } from '../utils/mockGenerator'
 import { getSchemaExample } from '../utils/schemaValidator'
@@ -526,14 +525,6 @@ const toggleFullscreen = () => {
   }
 }
 
-// ============ 生命周期 ============
-onMounted(() => {
-  // Monaco editor is created via template, no manual init needed
-})
-
-onBeforeUnmount(() => {
-  // Monaco cleanup handled by vue-monaco-editor
-})
 </script>
 
 <style scoped>

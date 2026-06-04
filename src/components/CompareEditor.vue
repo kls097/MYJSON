@@ -11,7 +11,6 @@
         :theme="theme"
         :options="editorOptions"
         @mount="handleMount"
-        @change="handleChange"
       />
     </div>
   </div>
@@ -267,15 +266,6 @@ function handleMount(editor) {
   })
 
   updateDecorations()
-}
-
-function handleChange(value) {
-  if (isProgrammaticUpdate) return
-}
-
-function scrollToPosition(scrollTop, scrollLeft) {
-  if (!editorInstance) return
-  editorInstance.setScrollPosition({ scrollTop, scrollLeft })
 }
 
 watch(() => props.scrollTop, (newVal) => {

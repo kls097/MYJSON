@@ -157,132 +157,10 @@ function setValueAtPath(obj, path, value) {
  * @param {MockOptions} options - 其他选项
  * @returns {Array} Mock 数据数组
  */
-export function generateMockBatch(schema, count, options = {}) {
+function generateMockBatch(schema, count, options = {}) {
   const opts = { ...options, count, asArray: true }
   const result = generateMockData(schema, opts)
   return JSON.parse(result)
-}
-
-/**
- * 生成 Mock 数据并返回数组格式
- * @param {string|Object} schema - JSON Schema
- * @param {number} count - 数量
- * @param {MockOptions} options - 其他选项
- * @returns {string} JSON 数组字符串
- */
-export function generateMockArray(schema, count, options = {}) {
-  const opts = { ...options, count, asArray: true }
-  return generateMockData(schema, opts)
-}
-
-/**
- * 保存 Mock 配置模板
- * @param {string} name - 模板名称
- * @param {Object} config - 配置对象
- */
-export function saveMockConfig(name, config) {
-  try {
-    const storageKey = `mock_config_${name}`
-    const data = {
-      name,
-      config,
-      createdAt: Date.now()
-    }
-    
-    if (window.utools) {
-      window.utools.db.put({
-        _id: storageKey,
-        data
-      })
-    } else {
-      localStorage.setItem(storageKey, JSON.stringify(data))
-    }
-  } catch (error) {
-    console.error('保存 Mock 配置失败:', error)
-  }
-}
-
-/**
- * 加载 Mock 配置模板
- * @param {string} name - 模板名称
- * @returns {Object|null} 配置对象
- */
-export function loadMockConfig(name) {
-  try {
-    const storageKey = `mock_config_${name}`
-    
-    if (window.utools) {
-      const doc = window.utools.db.get(storageKey)
-      return doc?.data?.config || null
-    } else {
-      const data = localStorage.getItem(storageKey)
-      return data ? JSON.parse(data).config : null
-    }
-  } catch (error) {
-    console.error('加载 Mock 配置失败:', error)
-    return null
-  }
-}
-
-/**
- * 获取所有保存的 Mock 配置
- * @returns {Array} 配置列表
- */
-export function getAllMockConfigs() {
-  try {
-    const configs = []
-    
-    if (window.utools) {
-      // 使用 uTools 数据库
-      const docs = window.utools.db.allDocs()
-      docs.forEach(doc => {
-        if (doc._id.startsWith('mock_config_')) {
-          configs.push({
-            name: doc.data.name,
-            createdAt: doc.data.createdAt
-          })
-        }
-      })
-    } else {
-      // 使用 localStorage
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i)
-        if (key && key.startsWith('mock_config_')) {
-          const data = JSON.parse(localStorage.getItem(key))
-          configs.push({
-            name: data.name,
-            createdAt: data.createdAt
-          })
-        }
-      }
-    }
-    
-    return configs.sort((a, b) => b.createdAt - a.createdAt)
-  } catch (error) {
-    console.error('获取 Mock 配置失败:', error)
-    return []
-  }
-}
-
-/**
- * 删除 Mock 配置
- * @param {string} name - 模板名称
- */
-export function deleteMockConfig(name) {
-  try {
-    const storageKey = `mock_config_${name}`
-    
-    if (window.utools) {
-      const doc = window.utools.db.get(storageKey)
-      if (doc) {
-        window.utools.db.remove(doc._id)
-      }
-    } else {
-      localStorage.removeItem(storageKey)
-    }
-  } catch (error) {
-    console.error('删除 Mock 配置失败:', error)
-  }
 }
 
 /**
@@ -342,14 +220,3 @@ export const countOptions = [
   { value: 100, label: '100 条' }
 ]
 
-/**
- * 验证 Mock 配置是否有效
- * @param {Object} config - 配置对象
- * @returns {boolean}
- */
-export function validateMockConfig(config) {
-  if (!config) return false
-  
-  const requiredFields = ['count', 'locale']
-  return requiredFields.every(field => field in config)
-}

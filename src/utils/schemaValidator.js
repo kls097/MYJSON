@@ -37,10 +37,6 @@ export function validateJsonWithSchema(jsonString, schemaString) {
     // 解析 Schema
     const schema = JSON.parse(schemaString)
 
-    console.log('=== Schema 验证调试 ===')
-    console.log('JSON 数据:', jsonData)
-    console.log('Schema:', schema)
-
     // 创建验证器（支持 $ref 引用）
     const ajv = createValidator()
 
@@ -49,9 +45,6 @@ export function validateJsonWithSchema(jsonString, schemaString) {
 
     // 执行验证
     const valid = validate(jsonData)
-
-    console.log('验证结果:', valid)
-    console.log('错误信息:', validate.errors)
 
     if (valid) {
       return {

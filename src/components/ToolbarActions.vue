@@ -396,22 +396,10 @@ onUnmounted(() => {
   font-size: 16px;
 }
 
-.dropdown-item-shortcut {
-  margin-left: auto;
-  font-size: 12px;
-  opacity: 0.6;
-  padding-left: 16px;
-}
-
 .dropdown-divider {
   height: 1px;
   background-color: var(--border);
   margin: 4px 0;
-}
-
-.undo-redo-section {
-  gap: 4px !important;
-  padding-right: 12px !important;
 }
 
 .format-section {

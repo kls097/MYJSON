@@ -83,9 +83,6 @@ const compareError = ref('')
 const currentDiffIndex = ref(-1)
 const diffList = ref([])
 let diffEditorInstance = null
-let leftFormatTimer = null
-let rightFormatTimer = null
-const FORMAT_DEBOUNCE_MS = 500
 
 function tryFormatEditor(editor) {
   const value = editor.getValue()
@@ -93,12 +90,35 @@ function tryFormatEditor(editor) {
   try {
     const formatted = formatJson(value, 2, false)
     if (formatted !== value) {
+      // Save scroll position
+      const scrollTop = editor.getScrollTop()
+      const scrollLeft = editor.getScrollLeft()
+
+      // Save cursor position as offset ratio
+      const position = editor.getPosition()
+      const model = editor.getModel()
+      const offset = model.getOffsetAt(position)
+      const totalLen = model.getValueLength()
+
       editor.pushUndoStop()
       editor.executeEdits('auto-format', [{
-        range: editor.getModel().getFullModelRange(),
+        range: model.getFullModelRange(),
         text: formatted
       }])
       editor.pushUndoStop()
+
+      // Restore cursor to approximately the same position
+      const newModel = editor.getModel()
+      const newTotalLen = newModel.getValueLength()
+      const newOffset = Math.min(
+        Math.round(offset * newTotalLen / totalLen),
+        newTotalLen
+      )
+      const newPosition = newModel.getPositionAt(newOffset)
+      editor.setPosition(newPosition)
+
+      // Restore scroll position
+      editor.setScrollPosition({ scrollTop, scrollLeft })
     }
   } catch {
     // Not valid JSON yet
@@ -136,22 +156,16 @@ function handleMount(editor) {
   const modifiedEditor = editor.getModifiedEditor()
   modifiedEditor.onDidChangeModelContent(() => {
     rightJson.value = modifiedEditor.getValue()
-    clearTimeout(rightFormatTimer)
-    rightFormatTimer = setTimeout(() => tryFormatEditor(modifiedEditor), FORMAT_DEBOUNCE_MS)
   })
   modifiedEditor.onDidPaste(() => {
-    clearTimeout(rightFormatTimer)
     tryFormatEditor(modifiedEditor)
   })
 
   const originalEditor = editor.getOriginalEditor()
   originalEditor.onDidChangeModelContent(() => {
     leftJson.value = originalEditor.getValue()
-    clearTimeout(leftFormatTimer)
-    leftFormatTimer = setTimeout(() => tryFormatEditor(originalEditor), FORMAT_DEBOUNCE_MS)
   })
   originalEditor.onDidPaste(() => {
-    clearTimeout(leftFormatTimer)
     tryFormatEditor(originalEditor)
   })
 
@@ -315,8 +329,6 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  clearTimeout(leftFormatTimer)
-  clearTimeout(rightFormatTimer)
   if (diffEditorInstance) {
     diffEditorInstance.dispose()
     diffEditorInstance = null

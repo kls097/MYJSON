@@ -889,6 +889,15 @@ function fixUnmatchedBrackets(str) {
 }
 
 /**
+ * 移除 JSON 字符串中的字符串字面量内容，避免误匹配字符串内的模式
+ * @param {string} str - JSON 字符串
+ * @returns {string} 移除字符串内容后的字符串
+ */
+function stripStrings(str) {
+  return str.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/'(?:[^'\\]|\\.)*'/g, "''")
+}
+
+/**
  * 检查JSON是否需要修复
  * @param {string} jsonStr - JSON字符串
  * @returns {{ needs: boolean, hint: string }} 是否需要修复 + 提示信息

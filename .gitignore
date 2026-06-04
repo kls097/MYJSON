@@ -147,5 +147,7 @@ dist
 !/CLAUDE.md
 !/myjson-plugin.upx
 !/docs/
+AGENTS.md
 test-results/
 小鬼的测试/
+.omc/

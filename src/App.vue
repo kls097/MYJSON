@@ -98,13 +98,13 @@
             v-if="showQueryPanel"
             @query-result="handleQueryResult"
             @query-error="handleQueryError"
-            @query-clear="handleQueryClear"
+            @query-clear="handleCloseQueryResult"
           />
           <JsonConvertPanel
             v-if="showConvertPanel"
             @convert-result="handleConvertResult"
             @convert-error="handleConvertError"
-            @convert-clear="handleConvertClear"
+            @convert-clear="handleCloseConvertResult"
           />
           <MonacoEditor
             v-if="viewMode === 'code'"
@@ -117,7 +117,7 @@
           <JsonGraphView
             v-else-if="viewMode === 'graph'"
             :json="graphInputData"
-            @node-click="handleGraphNodeClick"
+            @node-click="viewMode = 'code'"
             @extract-path="handleExtractPath"
           />
           <JsonTreeView
@@ -156,7 +156,6 @@
         :current-json="currentJson"
         @close="showSchemaPanel = false"
         @apply-mock="handleApplyMock"
-        @jump-to-error="handleJumpToError"
       />
 
       <SaveDialog
@@ -212,6 +211,7 @@ import { useSnapshots } from './composables/useSnapshots'
 import { excelToJson, jsonToExcel, validateJsonArray, getExportExample } from './utils/excelConverter'
 import { detectTableCandidates, setValueByPath } from './utils/jsonTableDetector'
 import { fixJson, needsFix as checkNeedsFix } from './utils/jsonFixer'
+import { saveFile, generateTimestampName, formatContentForSave } from './utils/fileSaver'
 import ToastNotification from './components/ToastNotification.vue'
 
 const {
@@ -228,8 +228,8 @@ const {
 
 const { saveDocument } = useJsonStorage()
 const { copyToClipboard } = useClipboard()
-const { canUndo, canRedo, pushHistory, undo, redo, initHistory, isUndoRedo } = useHistory()
-const { snapshots, saveSnapshot, hasSnapshots, getLastSnapshot, clearSnapshots } = useSnapshots()
+const { pushHistory, undo, initHistory } = useHistory()
+const { saveSnapshot, hasSnapshots, getLastSnapshot } = useSnapshots()
 
 
 const showHistory = ref(false)
@@ -239,7 +239,6 @@ const showConvertPanel = ref(false)  // 默认隐藏转换面板
 const showSchemaPanel = ref(false)  // 默认隐藏 Schema 面板
 
 const viewMode = ref('code')  // 视图模式: 'code' 或 'tree' 或 'graph'
-const activeFeature = ref('')
 const showCompareMode = ref(false)
 const showMergeMode = ref(false)
 const showThreeWayMergeMode = ref(false)
@@ -393,8 +392,6 @@ onMounted(() => {
 
   if (window.utools && window.utools.onPluginEnter) {
     window.utools.onPluginEnter(({ code, type, payload }) => {
-      activeFeature.value = code
-
       // 比较模式入口
       if (code === 'json_compare') {
         showCompareMode.value = true
@@ -645,58 +642,14 @@ const handleSaveToFile = () => {
   }
 }
 
-// 美化修复提示信息
-const getFixMessage = (result) => {
-  const levelDescriptions = {
-    1: '✓ JSON格式正确',
-    2: '✓ 智能修复完成',
-    3: '✓ JSON5格式修复完成',
-    4: '✓ 深度修复完成',
-    5: '✓ 高级修复完成',
-    6: '✓ 激进修复完成'
-  }
-
-  const fixTypeMap = {
-    'JSON格式正确，无需修复': '格式验证通过',
-    'jsonrepair修复(专业修复库)': '自动修复格式错误',
-    'JSON5修复(单引号/注释/尾随逗号/无引号键名)': '修复JSON5格式',
-    '基础预处理': '预处理特殊格式',
-    'jsonrepair修复': '智能修复',
-    'JSON5解析': '兼容性解析',
-    '深度预处理': '深度格式处理'
-  }
-
-  let message = levelDescriptions[result.level] || '✓ 修复完成'
-  message += '\n\n'
-
-  // 根据层级给出不同的说明
-  if (result.level === 1) {
-    message += '您的JSON格式正确，无需修复。'
-  } else if (result.level === 2) {
-    message += '已自动修复以下问题：\n'
-    const issues = [
-      '• 缺少或多余的引号',
-      '• 逗号和冒号错误',
-      '• 括号不匹配',
-      '• 特殊字符处理'
-    ]
-    message += issues.join('\n')
-  } else if (result.level === 3) {
-    message += '已处理JSON5格式：\n'
-    message += '• 单引号转双引号\n'
-    message += '• 移除注释\n'
-    message += '• 处理尾随逗号\n'
-    message += '• 为键名添加引号'
-  } else {
-    message += '已应用高级修复策略：\n'
-    const friendlyFixes = result.fixes.map(fix =>
-      fixTypeMap[fix] || fix
-    )
-    message += friendlyFixes.map(fix => `• ${fix}`).join('\n')
-  }
-
-  message += '\n\n是否应用修复结果？'
-  return message
+const FIX_TYPE_MAP = {
+  'JSON格式正确，无需修复': '格式验证通过',
+  'jsonrepair修复(专业修复库)': '自动修复格式错误',
+  'JSON5修复(单引号/注释/尾随逗号/无引号键名)': '修复JSON5格式',
+  '基础预处理': '预处理特殊格式',
+  'jsonrepair修复': '智能修复',
+  'JSON5解析': '兼容性解析',
+  '深度预处理': '深度格式处理'
 }
 
 // 处理JSON修复
@@ -706,18 +659,7 @@ const handleFixJson = () => {
   const result = fixJson(oldContent)
 
   if (result.success) {
-    const friendlyFixes = result.fixes.map(fix => {
-      const fixTypeMap = {
-        'JSON格式正确，无需修复': '格式验证通过',
-        'jsonrepair修复(专业修复库)': '自动修复格式错误',
-        'JSON5修复(单引号/注释/尾随逗号/无引号键名)': '修复JSON5格式',
-        '基础预处理': '预处理特殊格式',
-        'jsonrepair修复': '智能修复',
-        'JSON5解析': '兼容性解析',
-        '深度预处理': '深度格式处理'
-      }
-      return fixTypeMap[fix] || fix
-    })
+    const friendlyFixes = result.fixes.map(fix => FIX_TYPE_MAP[fix] || fix)
 
     const fixSummary = friendlyFixes.join('、')
 
@@ -932,61 +874,18 @@ const handleTableApply = (newData) => {
 // 处理表格视图的 Excel 导出
 const handleDownloadTableExcel = () => {
   try {
-    // tableData 已经是数组格式，直接使用
     const buffer = jsonToExcel(tableData.value)
-
-    // 生成默认文件名
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    const defaultName = `json_export_${timestamp}.xlsx`
-
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '导出到 Excel',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'Excel 文件', extensions: ['xlsx'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        const success = window.preloadUtils.writeFile(filePath, buffer)
-
-        if (!success) {
-          alert('导出失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const result = saveFile({
+      buffer,
+      filename: generateTimestampName('json_export', '.xlsx'),
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      title: '导出到 Excel',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
     })
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
+    if (result === false) alert('导出失败')
   } catch (error) {
     console.error('Excel 导出失败:', error)
     alert(`导出失败: ${error.message}`)
-  }
-}
-
-const handleClear = () => {
-  if (confirm('确定要清空当前的 JSON 吗?')) {
-    currentJson.value = ''
-    parsedJson.value = null
   }
 }
 
@@ -1010,11 +909,6 @@ const handleQueryError = (error) => {
   queryResult.value = null
 }
 
-const handleQueryClear = () => {
-  queryResult.value = null
-  queryError.value = ''
-}
-
 const handleCloseQueryResult = () => {
   queryResult.value = null
   queryError.value = ''
@@ -1030,12 +924,6 @@ const handleConvertResult = ({ result, language }) => {
 const handleConvertError = (error) => {
   convertError.value = error
   convertResult.value = ''
-  convertLanguage.value = ''
-}
-
-const handleConvertClear = () => {
-  convertResult.value = ''
-  convertError.value = ''
   convertLanguage.value = ''
 }
 
@@ -1069,16 +957,6 @@ const graphInputData = computed(() => {
   }
   return null
 })
-
-// 处理图谱节点点击 → 切换到代码视图并定位
-const handleGraphNodeClick = (node) => {
-  // 先切换到代码视图
-  viewMode.value = 'code'
-}
-
-const handleToggleView = () => {
-  viewMode.value = viewMode.value === 'code' ? 'tree' : 'code'
-}
 
 // 处理从树节点提取路径
 const handleExtractPath = (path) => {
@@ -1311,61 +1189,21 @@ const handleImportJson = async () => {
 // 处理Excel导出
 const handleExportExcel = () => {
   try {
-    // 验证当前 JSON 是否为数组格式
     const validation = validateJsonArray(currentJson.value)
-
     if (!validation.valid) {
-      // 显示错误和示例
-      const example = getExportExample()
-      alert(`${validation.error}\n\n${example}`)
+      alert(`${validation.error}\n\n${getExportExample()}`)
       return
     }
 
-    // 将 JSON 转换为 Excel Buffer
     const buffer = jsonToExcel(validation.data)
-
-    // 生成默认文件名
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    const defaultName = `json_export_${timestamp}.xlsx`
-
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '导出到 Excel',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'Excel 文件', extensions: ['xlsx'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        const success = window.preloadUtils.writeFile(filePath, buffer)
-
-        if (!success) {
-          alert('导出失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    const result = saveFile({
+      buffer,
+      filename: generateTimestampName('json_export', '.xlsx'),
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      title: '导出到 Excel',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
     })
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
+    if (result === false) alert('导出失败')
   } catch (error) {
     console.error('Excel 导出失败:', error)
     alert(`导出失败: ${error.message}`)
@@ -1380,66 +1218,17 @@ const handleSaveToLocal = () => {
       return
     }
 
-    // 生成默认文件名
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-    const defaultName = `json_${timestamp}.json`
-
-    // 优先使用 uTools 的文件保存对话框
-    if (window.utools && window.utools.showSaveDialog) {
-      const filePath = window.utools.showSaveDialog({
-        title: '保存 JSON 到本地',
-        defaultPath: defaultName,
-        buttonLabel: '保存',
-        filters: [
-          { name: 'JSON 文件', extensions: ['json'] },
-          { name: '文本文件', extensions: ['txt'] }
-        ]
-      })
-
-      if (!filePath) {
-        // 用户取消保存
-        return
-      }
-
-      // 使用 preload 提供的文件写入功能
-      if (window.preloadUtils && window.preloadUtils.writeFile) {
-        // 确保当前 JSON 是格式化的
-        let contentToSave = currentJson.value
-        try {
-          const parsed = JSON.parse(contentToSave)
-          contentToSave = JSON.stringify(parsed, null, 2)
-        } catch (e) {
-          // 如果不是有效 JSON，直接保存原内容
-        }
-
-        const success = window.preloadUtils.writeFile(filePath, contentToSave)
-
-        if (!success) {
-          alert('保存失败')
-        }
-        return
-      }
-    }
-
-    // 浏览器环境下使用 Blob 和 download
-    let contentToSave = currentJson.value
-    try {
-      const parsed = JSON.parse(contentToSave)
-      contentToSave = JSON.stringify(parsed, null, 2)
-    } catch (e) {
-      // 如果不是有效 JSON，直接保存原内容
-    }
-
-    const blob = new Blob([contentToSave], {
-      type: 'application/json;charset=utf-8'
+    const result = saveFile({
+      buffer: formatContentForSave(currentJson.value),
+      filename: generateTimestampName('json', '.json'),
+      mimeType: 'application/json;charset=utf-8',
+      title: '保存 JSON 到本地',
+      filters: [
+        { name: 'JSON 文件', extensions: ['json'] },
+        { name: '文本文件', extensions: ['txt'] }
+      ]
     })
-
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = defaultName
-    a.click()
-    URL.revokeObjectURL(url)
+    if (result === false) alert('保存失败')
   } catch (error) {
     console.error('保存到本地失败:', error)
     alert(`保存失败: ${error.message}`)
@@ -1459,15 +1248,6 @@ const handleApplyMock = (mockData) => {
   }
 }
 
-/**
- * 跳转到错误位置
- * @param {Object} error - 错误对象
- */
-const handleJumpToError = (error) => {
-  // 可以实现跳转到编辑器特定行的逻辑
-  // 目前只是简单的提示
-  console.log('跳转到错误:', error)
-}
 </script>
 
 <style>

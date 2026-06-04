@@ -99,7 +99,7 @@ export async function convertJsonToLanguage(jsonString, targetLang, typeName = '
  * @param {string} targetLang - 目标语言
  * @returns {string} 文件扩展名
  */
-export function getLanguageExtension(targetLang) {
+function getLanguageExtension(targetLang) {
   const extensionMap = {
     'TypeScript': '.ts',
     'Java': '.java',

@@ -6,7 +6,7 @@
  * 例如: "{\"name\":\"value\"}" -> {"name":"value"}
  * 支持多层嵌套转义的正确处理
  */
-export function unescapeJson(jsonStr) {
+function unescapeJson(jsonStr) {
   if (!jsonStr || typeof jsonStr !== 'string') {
     throw new Error('输入必须是字符串')
   }

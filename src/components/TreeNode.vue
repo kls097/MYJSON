@@ -172,13 +172,6 @@ const copyValue = () => {
   emit('copy', value)
 }
 
-const getTypeLabel = (value) => {
-  if (value === null) return 'null'
-  if (Array.isArray(value)) return `Array[${value.length}]`
-  if (typeof value === 'object') return `Object{${Object.keys(value).length}}`
-  return typeof value
-}
-
 const getTypeIcon = (value, key) => {
   // 根节点不显示图标（key 为 null 或 undefined）
   if (key === null || key === undefined) return ''

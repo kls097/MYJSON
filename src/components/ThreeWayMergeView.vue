@@ -154,6 +154,7 @@ import { VueMonacoEditor, loader } from '@guolao/vue-monaco-editor'
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import jsonWorker from 'monaco-editor/esm/vs/language/json/json.worker?worker'
 import { useJsonMerge } from '../composables/useJsonMerge'
+import { formatJson } from '../utils/jsonFormatter'
 import '../monaco-locale-init.js'
 
 // 直接导入 monaco 对象，避免依赖 window.monaco
@@ -204,8 +205,6 @@ const {
   baseJson,
   leftJson,
   rightJson,
-  mergeStrategy,
-  arrayStrategy,
   mergeResult,
   conflicts,
   threeWayStatus,
@@ -294,16 +293,6 @@ function validateRight(content) {
     isValidRight.value = true
   } catch (e) {
     isValidRight.value = false
-  }
-}
-
-function formatJson(content) {
-  if (!content || !content.trim()) return content
-  try {
-    const parsed = JSON.parse(content)
-    return JSON.stringify(parsed, null, 2)
-  } catch {
-    return content
   }
 }
 

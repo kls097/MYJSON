@@ -6,7 +6,7 @@
 /**
  * 内置模板列表
  */
-export const builtinTemplates = {
+const builtinTemplates = {
   // 用户信息
   user: {
     name: '用户信息',
@@ -743,7 +743,7 @@ export function getAllTemplates() {
  * 按分类获取模板
  * @returns {Object} 分类映射
  */
-export function getTemplatesByCategory() {
+function getTemplatesByCategory() {
   const templates = getAllTemplates()
   const categories = {}
   

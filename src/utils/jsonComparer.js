@@ -1,7 +1,7 @@
 // JSON 结构比较工具
 
 // 虚拟空行占位符标记（使用空行，通过CSS样式显示）
-export const PLACEHOLDER_LINE = ''
+const PLACEHOLDER_LINE = ''
 
 /**
  * 递归比较两个 JSON 对象,生成差异列表
@@ -180,7 +180,7 @@ export function compareJson(leftObj, rightObj, path = '$', depth = 0) {
  * 在 JSON 字符串中查找指定 JSONPath 的位置
  * 全新实现:使用更简单可靠的逐行扫描算法
  */
-export function findPathPosition(jsonStr, path, fallbackToParent = true) {
+function findPathPosition(jsonStr, path, fallbackToParent = true) {
   if (!jsonStr || !path || path === '$') return null
 
   try {
@@ -419,7 +419,7 @@ function escapeRegex(str) {
  * @param {string} rightJson - 右侧 JSON 字符串
  * @returns {Array} 带位置信息的差异列表
  */
-export function calculateEditorRanges(diffs, leftJson, rightJson) {
+function calculateEditorRanges(diffs, leftJson, rightJson) {
   return diffs.map(diff => {
     let leftRange = null
     let rightRange = null
@@ -483,7 +483,7 @@ function getParentPath(path) {
  * @param {*} value - 要序列化的值
  * @returns {string} 序列化后的字符串
  */
-export function serializeValue(value) {
+function serializeValue(value) {
   if (value === undefined) return 'undefined'
   if (value === null) return 'null'
   if (typeof value === 'string') return `"${value}"`
