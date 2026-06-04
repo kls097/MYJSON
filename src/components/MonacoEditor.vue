@@ -212,20 +212,7 @@ function handleMount(editor) {
   })
 
   editor.onDidPaste(() => {
-    const value = editor.getValue()
-    try {
-      const parsed = JSON.parse(value)
-      const formatted = JSON.stringify(parsed, null, 2)
-      if (formatted !== value) {
-        const position = editor.getPosition()
-        const model = editor.getModel()
-        editor.pushUndoStop()
-        model.setValue(formatted)
-        editor.setPosition(position)
-      }
-    } catch {
-      // not valid JSON, ignore
-    }
+    editor.getAction('editor.action.formatDocument')?.run()
   })
 
   validateJson(editor.getValue())
